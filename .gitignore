@@ -4,7 +4,8 @@
 env/
 venv/
 ENV/
-
+tests/
+qdrant_db/
 # Python
 __pycache__/
 *.py[cod]

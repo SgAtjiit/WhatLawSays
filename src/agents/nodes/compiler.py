@@ -16,11 +16,29 @@ async def run_response_compiler(state: GraphState) -> GraphState:
     scenario_domain = state.get("scenario_domain", "POTENTIAL_CRIMINAL")
     retries = state.get("retry_count", 0)
 
-    # Filter offenses to include DIRECT and CROSS_REFERENCE relevance levels only
-    valid_offenses = [
-        o for o in draft_offenses
-        if getattr(o, "relevance_level", "DIRECT") in ["DIRECT", "CROSS_REFERENCE"]
-    ]
+    # Filter offenses: Must be DIRECT/CROSS_REFERENCE, classified as OFFENSE, and free of procedural/contradicted items
+    valid_offenses = []
+    for o in draft_offenses:
+        relevance = getattr(o, "relevance_level", "DIRECT")
+        category = getattr(o, "provision_category", "OFFENSE")
+        act = str(getattr(o, "act_name", "")).lower()
+        desc = str(getattr(o, "offense_description", "")).lower()
+
+        if relevance not in ["DIRECT", "CROSS_REFERENCE"]:
+            continue
+        if category not in ["OFFENSE"]:
+            continue
+        if "nagrik" in act or "nagarik" in act or "bnss" in act or "crpc" in act or "sakshya" in act or "bsa" in act:
+            continue
+        if any(w in desc for w in ["definition", "procedure", "report", "diary", "examination of witness"]):
+            continue
+
+        # Check element audits for contradiction
+        audits = getattr(o, "element_audits", [])
+        if any(getattr(a, "status", "") == "CONTRADICTED_BY_FACT" for a in audits):
+            continue
+
+        valid_offenses.append(o)
 
     # Mathematical Multi-Component Confidence Calibration
     c_retrieval = 0.90 if state.get("retrieved_chunks") else 0.40
@@ -56,7 +74,27 @@ async def run_response_compiler(state: GraphState) -> GraphState:
     for offense in valid_offenses:
         offense.source_verified = verification_passed
 
-    clarification_questions = state.get("unknown_facts", [])
+    # Generate Element-Driven Clarification Questions
+    element_clarifications = []
+    for o in valid_offenses:
+        audits = getattr(o, "element_audits", [])
+        for a in audits:
+            if getattr(a, "status", "") == "UNPROVEN":
+                elem_name = getattr(a, "element_name", "")
+                question = f"Clarification needed for {getattr(o, 'act_name', 'BNS')} Section {getattr(o, 'section_number', '')} ({getattr(o, 'offense_description', '')}): Was the action accompanied by {elem_name.lower()}?"
+                if question not in element_clarifications:
+                    element_clarifications.append(question)
+
+    clarification_questions = element_clarifications if element_clarifications else state.get("unknown_facts", [])
+    applied_defences = state.get("applied_defences", [])
+    procedural_provisions = state.get("procedural_provisions", [])
+    raw_action_steps = state.get("immediate_action_steps", [])
+    citizen_duties = state.get("citizen_duties", [])
+
+    action_steps_payload = [
+        step.model_dump() if hasattr(step, "model_dump") else step
+        for step in raw_action_steps
+    ]
 
     # Update extracted_facts offense_status and scenario_domain in payload
     facts_payload = extracted_facts.model_dump() if extracted_facts else {}
@@ -71,6 +109,10 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         "reason": reason,
         "extracted_facts": facts_payload,
         "identified_offenses": [o.model_dump() for o in valid_offenses],
+        "applied_defences": applied_defences,
+        "procedural_provisions": procedural_provisions,
+        "immediate_action_steps": action_steps_payload,
+        "citizen_duties": citizen_duties,
         "clarification_questions": clarification_questions,
         "disclaimer": disclaimer,
     }

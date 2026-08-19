@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict
-from src.schemas.legal import ExtractedFacts, OffenseAnalysis
+from src.schemas.legal import ExtractedFacts, ImmediateActionStep, OffenseAnalysis
 
 
 class GraphState(TypedDict, total=False):
@@ -17,6 +17,10 @@ class GraphState(TypedDict, total=False):
     candidate_chunks: List[Dict[str, Any]]
     retrieved_chunks: List[Dict[str, Any]]
     draft_offenses: List[OffenseAnalysis]
+    applied_defences: List[str]
+    procedural_provisions: List[str]
+    immediate_action_steps: List[ImmediateActionStep]
+    citizen_duties: List[str]
     verification_passed: bool
     verification_feedback: Optional[str]
     is_conditional: Optional[bool]

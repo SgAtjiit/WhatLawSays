@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.agents.graph import legal_agent_app
 from src.config import settings
 from src.core.database import init_db
+from src.core.vector_store import vector_store
 from src.core.logger import pipeline_logger
 from src.core.task_queue import task_queue
 from src.schemas.legal import LegalAnalysisResponse, ScenarioRequest
@@ -34,9 +35,10 @@ RATE_LIMIT_STORE: Dict[str, list] = {}
 async def startup_event():
     pipeline_logger.log_step(
         "API GATEWAY",
-        f"Starting {settings.PROJECT_NAME}... Initializing DB & Queue dependencies.",
+        f"Starting {settings.PROJECT_NAME}... Initializing DB & Vector Store dependencies.",
     )
     await init_db()
+    await vector_store.setup_collection()
 
 
 @app.get("/health", tags=["System"])

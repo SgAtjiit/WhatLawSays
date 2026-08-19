@@ -33,10 +33,11 @@ async def run_legal_query_builder(state: GraphState) -> GraphState:
 
         prompt = (
             "You are a strict legal query generator agent.\n"
-            "Your objective is to generate clean retrieval queries using ONLY explicit facts and user terminology.\n\n"
+            "Your objective is to generate clean retrieval queries focusing strictly on the core legal action or incident using explicit facts and user terminology.\n\n"
             "[STRICT FORBIDDEN RULES]\n"
             "1. DO NOT inject assumptions, intent, criminality, illegality, or unauthorized status into queries.\n"
-            "2. DO NOT inject section numbers (e.g., 'BNS Section 305', 'BNSS Section 12') unless explicitly mentioned in the user prompt.\n\n"
+            "2. DO NOT inject section numbers (e.g., 'BNS Section 305', 'BNSS Section 12') unless explicitly mentioned in the user prompt.\n"
+            "3. DO NOT inject non-essential demographic keywords ('two women', 'female') or object names ('phone') into sparse queries unless theft/loss/damage of that object is explicitly alleged.\n\n"
             f"User Explicit Facts: {explicit_facts}\n"
             f"Raw Scenario: {scenario}"
         )
@@ -48,18 +49,20 @@ async def run_legal_query_builder(state: GraphState) -> GraphState:
             f"Groq API Info ({type(e).__name__}). Using Rule-Based Fact-Clean Query Builder Engine.",
             status="WARNING",
         )
-        # Rule-based clean query formulation
+        # Rule-based clean query formulation strictly from extracted facts
         clean_terms = []
         if facts:
-            clean_terms.extend([facts.actor, facts.action, facts.object_involved or ""])
+            clean_terms.extend([facts.action or "", facts.object_involved or ""])
         for ef in explicit_facts:
             clean_terms.append(ef)
 
         clean_text = " ".join([t for t in clean_terms if t]).strip()
+        if not clean_text:
+            clean_text = scenario
 
         queries = LegalQueryPayload(
-            dense_semantic_query=f"{clean_text} residence entry permission invitation trespass",
-            sparse_keyword_query=f"residence entry invitation permission trespass house search police",
+            dense_semantic_query=f"{clean_text}",
+            sparse_keyword_query=f"{clean_text}",
         )
 
     pipeline_logger.log_step(

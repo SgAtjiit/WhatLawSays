@@ -23,15 +23,27 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
 
         prompt = (
             "You are an authoritative legal fact extraction agent for Indian Law (BNS / BNSS / BSS / Constitution).\n"
-            "Analyze the citizen scenario and produce two completely separate arrays:\n"
-            "1. `explicit_facts`: Facts explicitly stated in the prompt without modifying them or adding assumptions.\n"
-            "2. `unknown_facts`: Indeterminate questions/facts. REMEMBER: UNKNOWN != FALSE and UNKNOWN != TRUE.\n"
-            "3. `scenario_domain`: Classify scenario domain as 'POTENTIAL_CRIMINAL', 'CIVIL', 'CONSTITUTIONAL', 'PROCEDURAL', 'MIXED', or 'UNKNOWN'.\n"
-            "4. `offense_status`: Always set initial offense_status to 'UNDETERMINED' at this stage.\n"
-            "5. Set `should_early_exit = True` ONLY if the input is completely vacuous or gibberish (e.g., 'help', 'asdf') where NO legal inference can be made.\n\n"
+            "Analyze the citizen scenario and produce three completely separate arrays:\n"
+            "1. `established_facts`: Objective, physical facts explicitly stated in the prompt without modifying them.\n"
+            "2. `user_allegations`: Subjective claims or accusations made by the user/actor.\n"
+            "3. `explicit_facts`: Combined union of established facts and user allegations.\n"
+            "4. `unknown_facts`: Indeterminate questions/facts. REMEMBER: UNKNOWN != FALSE and UNKNOWN != TRUE.\n"
+            "5. `scenario_domain`: Classify scenario domain as 'POTENTIAL_CRIMINAL', 'CIVIL', 'CONSTITUTIONAL', 'PROCEDURAL', 'MIXED', or 'UNKNOWN'.\n"
+            "6. `offense_status`: Always set initial offense_status to 'UNDETERMINED' at this stage.\n"
+            "7. Set `should_early_exit = True` ONLY if the input is completely vacuous or gibberish (e.g., 'help', 'asdf') where NO legal inference can be made.\n\n"
             f"Citizen Scenario: {scenario}"
         )
         facts: ExtractedFacts = await llm.ainvoke(prompt)
+        if not facts.established_facts:
+            facts.established_facts = facts.explicit_facts
+
+        # Deduplicate unknown_facts against established_facts and user_allegations
+        known_set = set([f.lower() for f in (facts.established_facts + facts.user_allegations)])
+        deduped_unknowns = []
+        for u in facts.unknown_facts:
+            if u.lower() not in known_set:
+                deduped_unknowns.append(u)
+        facts.unknown_facts = deduped_unknowns
     except Exception as e:
         pipeline_logger.log_step(
             "AGENT 1: FACT EXTRACTOR",
@@ -43,6 +55,8 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
         if len(scenario.strip().split()) < 3 and not any(k in s_lower for k in ["theft", "stole", "police", "arrest", "hit", "kill", "fight", "rob", "cheat", "enter", "party"]):
             facts = ExtractedFacts(
                 explicit_facts=[scenario],
+                established_facts=[scenario],
+                user_allegations=[],
                 unknown_facts=["Unclear scenario description"],
                 actor="Unknown",
                 action="Unclear action",
@@ -84,6 +98,8 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
 
             facts = ExtractedFacts(
                 explicit_facts=explicit,
+                established_facts=explicit,
+                user_allegations=[],
                 unknown_facts=unknowns,
                 actor=actor,
                 action=action,
