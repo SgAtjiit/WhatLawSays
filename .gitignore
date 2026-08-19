@@ -1,0 +1,29 @@
+# Environments
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+config.py
+# `uv` specific
+uv.lock
+
+# IDEs
+.vscode/
+.idea/
+
+# Testing/Coverage
+.pytest_cache/
+coverage.xml
+htmlcov/
+.coverage
+
+# Logs & Databases
+*.log
+*.sqlite3
