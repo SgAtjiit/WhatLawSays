@@ -43,9 +43,6 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 - 🚨 **Actionable Citizen Guidance & Statutory Reporting Duties**:
   - Generates prioritized immediate action steps (emergency helpline 112, filing e-FIR, medical audit, digital evidence preservation).
   - Highlights statutory duties required of citizens under Indian criminal procedure (e.g. BNSS Section 33 obligation to report certain offenses).
-- 📊 **Mathematical Calibrated Confidence Scoring**:
-  - Calculates confidence from measurable factors:
-    $$\text{Confidence} = C_{\text{retrieval}} \times C_{\text{authority}} \times C_{\text{element\_coverage}} \times C_{\text{fact\_consistency}}$$
 - 🛡️ **System `UNDETERMINED` State**:
   - Returns a grounded legal explanation when facts are insufficient to establish an offense instead of making false claims.
 
