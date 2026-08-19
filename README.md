@@ -5,6 +5,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.42+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-FF6F00?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
 [![Qdrant](https://img.shields.io/badge/Qdrant-Hybrid--Vector--DB-DC2626?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 [![Groq](https://img.shields.io/badge/Groq-Llama3.3%20%2F%20GPT--OSS-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
@@ -53,7 +54,10 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 ## 📂 Project Structure
 
 ```text
-whatLawSays/
+├── frontend/
+│   ├── app.py                   # Streamlit Interactive Web Application
+│   ├── components.py            # Streamlit UI Components, Styling & Cards
+│   └── sample_scenarios.py      # Predefined Legal Test Scenarios
 ├── src/
 │   ├── main.py                  # FastAPI Application Gateway & Middleware
 │   ├── config.py                # Pydantic Settings & Environment Configurations
@@ -132,6 +136,12 @@ uv run python -m scripts.ingest_legal_corpus
 uv run uvicorn src.main:app --reload --port 8000
 ```
 Interactive API Documentation will be available at: **`http://localhost:8000/docs`**
+
+### 6. Run Interactive Streamlit Frontend UI
+```bash
+uv run streamlit run frontend/app.py
+```
+Interactive Web Workbench will open at: **`http://localhost:8501`**
 
 ---
 

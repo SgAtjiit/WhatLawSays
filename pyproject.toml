@@ -17,6 +17,7 @@ dependencies = [
     "qdrant-client>=1.19.0",
     "redis>=8.1.0",
     "sqlalchemy>=2.0.52",
+    "streamlit>=1.42.0",
     "uvicorn[standard]>=0.52.4",
 ]
 
