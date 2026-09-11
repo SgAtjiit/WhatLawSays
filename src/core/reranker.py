@@ -12,9 +12,9 @@ class LegalCrossEncoderReranker:
     def _get_reranker(self):
         if self._reranker is None:
             try:
-                from fastembed.rerank.cross_encoder import TextReRanker
+                from fastembed.rerank.cross_encoder import TextCrossEncoder
 
-                self._reranker = TextReRanker(model_name=self.model_name)
+                self._reranker = TextCrossEncoder(model_name=self.model_name)
             except Exception as e:
                 pipeline_logger.log_step(
                     "LEGAL RERANKER",
