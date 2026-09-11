@@ -195,7 +195,14 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                     applied_defences.append(def_entry)
                 continue
 
-            # 3. Specific Offense Statutory Element Audits
+            # 3. Penalty Gate: a provision that prescribes no penalty cannot create
+            # an offence (e.g. POSH s.8 Grants and audit, s.4 Constitution of the
+            # Internal Complaints Committee). Checked with `is False` so a chunk
+            # indexed before this flag existed is not silently dropped.
+            if chunk.get("prescribes_penalty") is False:
+                continue
+
+            # 4. Specific Offense Statutory Element Audits
             # Dowry Death (Sec 80)
             if "80" in sec_num or "dowry" in title_lower:
                 if "dowry" not in ef_joined and "husband" not in ef_joined and "marriage" not in ef_joined:

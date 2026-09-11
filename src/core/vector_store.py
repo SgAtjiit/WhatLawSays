@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Dict, List, Optional
 from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import AsyncQdrantClient, models
@@ -14,8 +15,32 @@ ACT_CONSTITUTION = "Constitution of India"
 # substantive penal law outnumbered roughly 3:1 in every candidate pool, so
 # procedural and constitutional provisions crowded out the sections an offence
 # analysis actually needs.
-SUBSTANTIVE_ACTS = [ACT_BNS]
+ACT_IT = "The Information Technology Act, 2000 (IT Act)"
+ACT_POSH = (
+    "The Sexual Harassment of Women at Workplace "
+    "(Prevention, Prohibition and Redressal) Act, 2013 (POSH Act)"
+)
+
+# The IT Act (ss. 65-74) and the POSH Act (s. 26) both create offences, so they
+# join the BNS in the offence-identification pass. Their procedural and
+# definitional sections are filtered out downstream by title, exactly as the
+# BNS's own preliminary provisions already are.
+SUBSTANTIVE_ACTS = [ACT_BNS, ACT_IT, ACT_POSH]
 PROCEDURAL_ACTS = [ACT_BNSS, ACT_BSA, ACT_CONSTITUTION]
+
+# Namespace for deterministic point ids (see _point_id).
+_POINT_NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")
+
+
+def _point_id(doc: LegalSectionDoc) -> str:
+    """Stable id derived from the act and section.
+
+    The previous scheme numbered points by their position in the batch, so
+    ingesting one Act on its own would silently overwrite the first N points of
+    whatever was already indexed. Deriving the id from the document's identity
+    makes ingestion idempotent and safely incremental.
+    """
+    return str(uuid.uuid5(_POINT_NAMESPACE, f"{doc.act}|{doc.section_number}"))
 
 
 class LegalVectorStore:
@@ -77,6 +102,13 @@ class LegalVectorStore:
           },
       )
 
+  async def recreate_collection(self):
+    """Drops and rebuilds the collection, for a full corpus rebuild."""
+    await self.ensure_initialized()
+    await self.client.delete_collection(collection_name=self.collection_name)
+    await self.setup_collection()
+    await self._ensure_act_index()
+
   async def ensure_initialized(self):
     """Ensures that the Qdrant client connection and collection are initialized."""
     if self.client is None:
@@ -114,10 +146,10 @@ class LegalVectorStore:
       sparse_embeddings = list(self.sparse_model.embed(texts))
 
       points = []
-      for offset, (doc, dense_vec, sparse_vec) in enumerate(
-          zip(batch_docs, dense_embeddings, sparse_embeddings)
+      for doc, dense_vec, sparse_vec in zip(
+          batch_docs, dense_embeddings, sparse_embeddings
       ):
-        point_id = i + offset + 1
+        point_id = _point_id(doc)
         points.append(
             models.PointStruct(
                 id=point_id,

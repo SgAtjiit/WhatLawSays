@@ -127,7 +127,8 @@ catches it), so a fresh clone has no config at all and the app will not import â
 
 ## 6. Seed the legal corpus
 
-Indexes 1580 sections (BNS, BNSS, BSA, Constitution). The first run downloads the
+Indexes 1719 sections (BNS, BNSS, BSA, Constitution, IT Act, POSH Act). Point ids are
+derived from act + section, so re-running is idempotent. The first run downloads the
 `bge-small-en-v1.5` and `Qdrant/bm25` ONNX models. Takes ~2 minutes.
 
 ```bash
@@ -139,7 +140,7 @@ Verify:
 ```bash
 curl -s http://localhost:6333/collections/whatlawsays_legal_corpus \
   | python3 -c "import sys,json; d=json.load(sys.stdin)['result']; print(d['points_count'], d['status'])"
-# -> 1580 green
+# -> 1719 green
 ```
 
 ## 7. Run it (two terminals)
@@ -214,7 +215,7 @@ produces this sequence â€” watching it is the fastest way to see the pipeline wo
 [AGENT 1: FACT EXTRACTOR]              established / alleged / unknown facts
 [AGENT 2: LEGAL QUERY BUILDER]         fact-clean retrieval queries
 [QDRANT VECTOR STORE]                  act-scoped hybrid search, two pools:
-                                       BNS (offences) + BNSS/BSA/Constitution (procedural)
+                                       BNS/IT/POSH (offences) + BNSS/BSA/Constitution (procedural)
 [STEP 3: LEGAL RERANKER]               each pool reranked independently, top-N -> top-K
 [AGENT 3: LEGAL ANALYST]               statutory elements, exceptions, actions
 [AGENT 4: VERIFICATION AGENT]          claim -> evidence -> fact judge

@@ -8,11 +8,18 @@ from src.schemas.corpus import LegalSectionDoc
 
 async def main():
     data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
-    corpus_files = ["constitution.json", "bsa.json", "bns.json", "bnss.json"]
+    corpus_files = [
+        "constitution.json",
+        "bsa.json",
+        "bns.json",
+        "bnss.json",
+        "it_act.json",
+        "posh_act.json",
+    ]
 
     all_documents = []
 
-    print("[+] Loading Full Legal Corpus Datasets (Constitution, BSA, BNS, BNSS)...")
+    print("[+] Loading Full Legal Corpus Datasets (Constitution, BSA, BNS, BNSS, IT Act, POSH Act)...")
     start_time = time.time()
 
     for fname in corpus_files:
@@ -30,8 +37,12 @@ async def main():
 
     print(f"[+] Total Legal Sections Loaded: {len(all_documents)}", flush=True)
 
-    print("[+] Initializing Qdrant Collection with Hybrid Vector Schemas (Dense Cosine + Sparse BM25)...", flush=True)
-    await vector_store.setup_collection()
+    # Point ids are derived from act + section, so a rebuild is idempotent. The
+    # collection is recreated so that points from a previous ingest which are no
+    # longer in the corpus (or were written under the old positional id scheme)
+    # do not linger as duplicates.
+    print("[+] Rebuilding Qdrant Collection with Hybrid Vector Schemas (Dense Cosine + Sparse BM25)...", flush=True)
+    await vector_store.recreate_collection()
 
     print(f"[+] Upserting {len(all_documents)} Legal Documents into Qdrant Vector Store...", flush=True)
     await vector_store.upsert_legal_documents(all_documents, batch_size=64)

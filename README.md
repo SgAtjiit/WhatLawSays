@@ -38,8 +38,9 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
   - Evaluates section-specific statutory exceptions (e.g. Grave & Sudden Provocation) and general legal defences (e.g. Right of Private Defence BNS Sec 38–44).
   - Automatically exonerates accused parties if statutory elements are `CONTRADICTED_BY_FACT` (e.g. valid invitation negates criminal trespass).
 - 🔍 **Act-Scoped Two-Pass Retrieval**:
-  - The offence-identification pass searches **BNS only**. The corpus is 1,580 sections of which BNS is just 358, so an unscoped search left substantive penal law outnumbered roughly 3:1 and procedural/constitutional provisions displaced the offence sections the analyst needs.
+  - The offence-identification pass searches **offence-creating law only** — BNS, IT Act and POSH Act. The corpus is 1,719 sections; an unscoped search left substantive penal law outnumbered roughly 3:1, so procedural and constitutional provisions displaced the offence sections the analyst needs.
   - A second pass retrieves **BNSS / BSA / Constitution** separately. These populate the procedural tab only and are never candidates for the offences array.
+  - Within the substantive Acts, a section is eligible to be an offence only if it **prescribes a penalty**, a flag derived at ingest from the section's own verbatim text. The IT Act and POSH Act are internally mixed, so act-level scoping alone would have reported POSH s.8 (Grants and audit) and s.4 (Constitution of the Internal Complaints Committee) as offences.
   - Each pool is reranked independently, and the act filter is applied inside both the dense and sparse prefetches so it shapes candidate generation rather than merely trimming the fused result.
   - Confidence grounding is measured against the substantive pool alone, so a BNSS citation appearing in the offences array reads as ungrounded.
 - 📊 **Measured Confidence Estimation**:
@@ -95,6 +96,7 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │       └── corpus.py            # Legal Section Data Schemas
 ├── scripts/
 │   ├── ingest_legal_corpus.py   # Seed Data Ingestion Script (Batch & Async Setup)
+│   ├── fetch_indiacode_act.py   # Fetches an Act's sections verbatim from India Code
 │   ├── test_pipeline.py         # End-to-End Pipeline Integration Test
 │   ├── test_hybrid_search.py   # Hybrid Vector Search Verification Script
 │   └── test_president_invitation.py # Test Script for Undetermined Scenario
@@ -137,6 +139,32 @@ DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/whatlawsays"
 ```bash
 docker-compose up -d
 ```
+
+### Legal corpus
+
+1,719 sections indexed from six statutes:
+
+| Statute | Sections | Pool |
+|---|---|---|
+| Bharatiya Nyaya Sanhita, 2023 (BNS) | 358 | offence |
+| Information Technology Act, 2000 | 109 | offence |
+| Sexual Harassment of Women at Workplace Act, 2013 (POSH) | 30 | offence |
+| Bharatiya Nagarik Suraksha Sanhita, 2023 (BNSS) | 533 | procedural |
+| Constitution of India | 519 | procedural |
+| Bharatiya Sakshya Adhiniyam, 2023 (BSA) | 170 | procedural |
+
+The IT Act and POSH Act are sourced from **[India Code](https://indiacode.gov.in)**, the
+Government of India's official legislative repository, via its DSpace REST API. Section
+text is copied verbatim and never paraphrased. To refresh or add an Act:
+
+```bash
+uv run python scripts/fetch_indiacode_act.py <act_id> "<Short Tag>" data/<file>.json
+```
+
+Provisions that India Code marks as omitted are excluded — 16 for the IT Act, including
+**s. 66A**, struck down in *Shreya Singhal v. Union of India* but still printed in the
+bare Act. Cognizability and bailability are not stated in the source text and are left
+unset rather than inferred.
 
 ### 4. Seed Legal Corpus into Qdrant
 ```bash

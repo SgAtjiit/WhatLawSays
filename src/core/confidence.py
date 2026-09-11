@@ -149,6 +149,13 @@ def retrieval_decisiveness(chunks: Sequence[Dict[str, Any]]) -> float:
 def act_family(act: str) -> str:
     """Collapse act-name variants onto a stable family token."""
     a = (act or "").lower()
+    # Special Acts first: without their own families they would all collapse into
+    # "unknown", letting an IT Act section cross-match a POSH section of the same
+    # number and ground one citation against the other's text.
+    if "information technology" in a or "(it act" in a:
+        return "it"
+    if "sexual harassment" in a or "posh" in a:
+        return "posh"
     # BNSS must be tested before BNS: the substring "bns" also matches "bnss".
     if "nagarik" in a or "nagrik" in a or "bnss" in a or "crpc" in a or "criminal procedure" in a:
         return "bnss"

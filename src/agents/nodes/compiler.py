@@ -1,5 +1,9 @@
 from src.agents.state import GraphState
-from src.core.confidence import estimate_absence_confidence, estimate_confidence
+from src.core.confidence import (
+    estimate_absence_confidence,
+    estimate_confidence,
+    section_key,
+)
 from src.core.database import save_analysis_record
 from src.core.logger import pipeline_logger
 from src.schemas.legal import LegalAnalysisResponse
@@ -22,6 +26,15 @@ async def run_response_compiler(state: GraphState) -> GraphState:
     reranker_available = state.get("reranker_available", True)
     contradicted_provisions = state.get("contradicted_provisions", []) or []
 
+    # Which retrieved sections actually prescribe a penalty. Backstops the LLM
+    # path, which assigns provision_category itself and can mis-label a committee
+    # or audit provision as an offence.
+    penalty_index = {}
+    for chunk in retrieved_chunks:
+        key = section_key(chunk.get("act", ""), chunk.get("section_number", ""))
+        if key[1] and "prescribes_penalty" in chunk:
+            penalty_index[key] = chunk["prescribes_penalty"]
+
     # Filter offenses: Must be DIRECT/CROSS_REFERENCE, classified as OFFENSE, and free of procedural/contradicted items
     valid_offenses = []
     contradicted_offenses = []
@@ -38,6 +51,9 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         if "nagrik" in act or "nagarik" in act or "bnss" in act or "crpc" in act or "sakshya" in act or "bsa" in act:
             continue
         if any(w in desc for w in ["definition", "procedure", "report", "diary", "examination of witness"]):
+            continue
+        # A section prescribing no penalty cannot create an offence.
+        if penalty_index.get(section_key(getattr(o, "act_name", ""), getattr(o, "section_number", ""))) is False:
             continue
 
         # Check element audits for contradiction. These are recorded rather than
