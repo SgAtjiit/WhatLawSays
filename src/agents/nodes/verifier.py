@@ -29,6 +29,8 @@ async def run_verifier(state: GraphState) -> GraphState:
     draft = [o.model_dump() for o in state.get("draft_offenses", [])]
     source_texts = state.get("retrieved_chunks", [])
 
+    llm_available = state.get("llm_available", True)
+
     try:
         llm = ChatGroq(
             model=settings.GROQ_MODEL,
@@ -68,6 +70,7 @@ async def run_verifier(state: GraphState) -> GraphState:
             f"Groq API Info ({type(e).__name__}). Using Rule-Based Claim-Evidence Verification Engine.",
             status="WARNING",
         )
+        llm_available = False
         ef_joined = " ".join(explicit_facts).lower()
         failed = False
         feedback = None
@@ -161,6 +164,7 @@ async def run_verifier(state: GraphState) -> GraphState:
             **state,
             "verification_passed": True,
             "verification_feedback": None,
+            "llm_available": llm_available,
         }
     else:
         pipeline_logger.log_step(
@@ -176,4 +180,5 @@ async def run_verifier(state: GraphState) -> GraphState:
             **state,
             "verification_passed": False,
             "verification_feedback": verification.correction_feedback or verification.audit_reasoning,
+            "llm_available": llm_available,
         }

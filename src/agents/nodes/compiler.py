@@ -1,4 +1,5 @@
 from src.agents.state import GraphState
+from src.core.confidence import estimate_absence_confidence, estimate_confidence
 from src.core.database import save_analysis_record
 from src.core.logger import pipeline_logger
 from src.schemas.legal import LegalAnalysisResponse
@@ -7,17 +8,23 @@ from src.schemas.legal import LegalAnalysisResponse
 async def run_response_compiler(state: GraphState) -> GraphState:
     pipeline_logger.log_step(
         "STEP 5: RESPONSE COMPILER",
-        "Calculating Multi-Component Confidence Calibration & Finalizing Response...",
+        "Estimating Multi-Component Confidence & Finalizing Response...",
     )
 
     draft_offenses = state.get("draft_offenses", [])
     extracted_facts = state.get("extracted_facts")
     verification_passed = state.get("verification_passed", False)
     scenario_domain = state.get("scenario_domain", "POTENTIAL_CRIMINAL")
-    retries = state.get("retry_count", 0)
+    retry_count = state.get("retry_count", 0)
+    retrieved_chunks = state.get("retrieved_chunks", [])
+    unknown_facts = state.get("unknown_facts", [])
+    llm_available = state.get("llm_available", True)
+    reranker_available = state.get("reranker_available", True)
+    contradicted_provisions = state.get("contradicted_provisions", []) or []
 
     # Filter offenses: Must be DIRECT/CROSS_REFERENCE, classified as OFFENSE, and free of procedural/contradicted items
     valid_offenses = []
+    contradicted_offenses = []
     for o in draft_offenses:
         relevance = getattr(o, "relevance_level", "DIRECT")
         category = getattr(o, "provision_category", "OFFENSE")
@@ -33,32 +40,66 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         if any(w in desc for w in ["definition", "procedure", "report", "diary", "examination of witness"]):
             continue
 
-        # Check element audits for contradiction
+        # Check element audits for contradiction. These are recorded rather than
+        # silently dropped: a contradicted element is affirmative evidence that no
+        # offence arises, which scores very differently from "we could not tell".
         audits = getattr(o, "element_audits", [])
         if any(getattr(a, "status", "") == "CONTRADICTED_BY_FACT" for a in audits):
+            contradicted_offenses.append(o)
             continue
 
         valid_offenses.append(o)
 
-    # Mathematical Multi-Component Confidence Calibration
-    c_retrieval = 0.90 if state.get("retrieved_chunks") else 0.40
-    c_authority = 1.00
-    c_element_coverage = 0.85 if valid_offenses else 0.50
-    c_fact_consistency = 0.95 if verification_passed else 0.40
+    # Confidence estimation. Every component is measured from a signal the
+    # pipeline actually produced -- cross-encoder relevance, element audits,
+    # verification outcome, unsupplied facts -- rather than from a constant.
+    if valid_offenses:
+        confidence_report = estimate_confidence(
+            offenses=valid_offenses,
+            retrieved_chunks=retrieved_chunks,
+            verification_passed=verification_passed,
+            retry_count=retry_count,
+            unknown_facts=unknown_facts,
+            llm_available=llm_available,
+            reranker_available=reranker_available,
+        )
+        absence_status = None
+    else:
+        absence_status, confidence_report = estimate_absence_confidence(
+            retrieved_chunks=retrieved_chunks,
+            # Contradictions reach the compiler two ways: recorded upstream by the
+            # analyst, or on a draft offense that this filter just excluded.
+            has_contradiction=bool(contradicted_offenses or contradicted_provisions),
+            unknown_facts=unknown_facts,
+            llm_available=llm_available,
+            reranker_available=reranker_available,
+        )
 
-    calibrated_confidence = c_retrieval * c_authority * c_element_coverage * c_fact_consistency
-    calibrated_confidence = round(min(max(calibrated_confidence, 0.25), 0.95), 2)
+    confidence_estimate = confidence_report.score
 
     # Determine status, offense_status, and justification
     if not valid_offenses:
-        status = "UNDETERMINED"
-        offense_status = "UNDETERMINED"
-        calibrated_confidence = 0.35
-        reason = "The supplied facts do not establish the elements of an offence."
-        disclaimer = (
-            "Not established from the supplied facts does not prove no offence occurred. "
-            "Answering the unknown facts below will refine the legal analysis."
-        )
+        offense_status = absence_status
+        if offense_status == "NOT_ESTABLISHED":
+            # Relevant law was retrieved and its elements are contradicted by the
+            # facts. That is a finding, not a failure to answer.
+            status = "SUCCESS"
+            reason = (
+                "Relevant statutory provisions were retrieved and their mandatory elements "
+                "are contradicted by the supplied facts: no offence is made out."
+            )
+            disclaimer = (
+                "This finding rests on the facts as supplied. Additional facts could change it. "
+                "This platform provides source-grounded legal information based on BNS/BNSS/BSS, "
+                "not formal legal counsel."
+            )
+        else:
+            status = "UNDETERMINED"
+            reason = "The supplied facts do not establish the elements of an offence."
+            disclaimer = (
+                "Not established from the supplied facts does not prove no offence occurred. "
+                "Answering the unknown facts below will refine the legal analysis."
+            )
     elif verification_passed:
         status = "SUCCESS"
         offense_status = "ESTABLISHED"
@@ -105,7 +146,8 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         "status": status,
         "scenario_domain": scenario_domain,
         "offense_status": offense_status,
-        "confidence_score": calibrated_confidence,
+        "confidence_score": confidence_estimate,
+        "confidence_basis": confidence_report.to_payload(),
         "reason": reason,
         "extracted_facts": facts_payload,
         "identified_offenses": [o.model_dump() for o in valid_offenses],
@@ -114,18 +156,23 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         "immediate_action_steps": action_steps_payload,
         "citizen_duties": citizen_duties,
         "clarification_questions": clarification_questions,
+        "excluded_provisions": contradicted_provisions,
         "disclaimer": disclaimer,
     }
 
     pipeline_logger.log_step(
         "STEP 5: RESPONSE COMPILER",
-        f"Response compilation complete! Status: [{status}] | Domain: [{scenario_domain}] | Offense Status: [{offense_status}] | Confidence: {calibrated_confidence:.2f}",
+        f"Response compilation complete! Status: [{status}] | Domain: [{scenario_domain}] | Offense Status: [{offense_status}] | Confidence: {confidence_estimate:.2f}",
         details={
             "status": status,
             "scenario_domain": scenario_domain,
             "offense_status": offense_status,
             "identified_offenses_count": len(valid_offenses),
-            "calibrated_confidence": calibrated_confidence,
+            "confidence_estimate": confidence_estimate,
+            "confidence_components": {
+                k: round(v, 3) for k, v in confidence_report.components.items()
+            },
+            "confidence_caps_applied": confidence_report.caps_applied,
             "unknown_facts_count": len(clarification_questions),
         },
         status="SUCCESS",
@@ -137,8 +184,14 @@ async def run_response_compiler(state: GraphState) -> GraphState:
         task_id=task_id,
         scenario_text=state["scenario_text"],
         status=status,
-        confidence_score=calibrated_confidence,
+        confidence_score=confidence_estimate,
         response_payload=final_payload,
     )
 
-    return {**state, "final_response": final_payload}
+    return {
+        **state,
+        "offense_status": offense_status,
+        "confidence_score": confidence_estimate,
+        "confidence_basis": confidence_report.to_payload(),
+        "final_response": final_payload,
+    }

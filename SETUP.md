@@ -166,11 +166,28 @@ curl -s -X POST http://localhost:8000/api/v1/analyze \
   | python3 -m json.tool
 ```
 
-Expect `status: SUCCESS`, confidence `0.73`, and 9 offenses led by BNS Section 303 (Theft),
-each with `punishment_severity`, `cognizable`, and `bailable` populated.
+Expect `status: SUCCESS`, 9 offenses led by BNS Section 303 (Theft), each with
+`punishment_severity`, `cognizable`, and `bailable` populated, and a confidence in
+the **0.80–0.95** band.
 
-The README's President's-residence scenario is the `UNDETERMINED` path — it returns
-`status: UNDETERMINED`, confidence `0.35`, 0 offenses, exactly as documented.
+Confidence is measured per request, not fixed, so do not assert an exact value: it
+moves with how decisively retrieval separated a best match, how many statutory
+elements the facts actually support, whether verification passed on the first
+attempt, and how many facts the scenario left unknown. The `confidence_basis` object in the response shows the
+per-component breakdown behind the number.
+
+If a component degraded, confidence is capped and `confidence_basis.caps_applied`
+says which: `llm_fallback<=0.60`, `reranker_fallback<=0.75`,
+`ungrounded_citation<=0.50` (a cited section absent from the retrieved corpus), or
+`undetermined<=0.45`. The estimator never returns above `0.95` or below `0.05`.
+
+The README's President's-residence scenario is the no-offence path. It resolves one
+of two ways, which the previous build collapsed into a single hardcoded `0.35`:
+
+| Outcome | When | Confidence |
+|---|---|---|
+| `status: SUCCESS`, `offense_status: NOT_ESTABLISHED` | relevant law retrieved and its elements are contradicted by the facts | high — an affirmative finding |
+| `status: UNDETERMINED`, `offense_status: UNDETERMINED` | weak retrieval, or nothing contradicted | low, capped at `0.45` |
 
 Persistence:
 
@@ -196,11 +213,12 @@ produces this sequence — watching it is the fastest way to see the pipeline wo
 [WORKER CONSUMER]      LangGraph orchestrator invoked
 [AGENT 1: FACT EXTRACTOR]              established / alleged / unknown facts
 [AGENT 2: LEGAL QUERY BUILDER]         fact-clean retrieval queries
-[QDRANT VECTOR STORE]                  hybrid dense + BM25 search, RRF merge
-[STEP 3: LEGAL RERANKER]               top-N candidates -> top-K
+[QDRANT VECTOR STORE]                  act-scoped hybrid search, two pools:
+                                       BNS (offences) + BNSS/BSA/Constitution (procedural)
+[STEP 3: LEGAL RERANKER]               each pool reranked independently, top-N -> top-K
 [AGENT 3: LEGAL ANALYST]               statutory elements, exceptions, actions
 [AGENT 4: VERIFICATION AGENT]          claim -> evidence -> fact judge
-[STEP 5: RESPONSE COMPILER]            calibrated confidence, final response
+[STEP 5: RESPONSE COMPILER]            confidence estimate, final response
 [POSTGRESQL DB]        record persisted
 [CLIENT API]           JSON returned
 ```
@@ -212,6 +230,9 @@ produces this sequence — watching it is the fastest way to see the pipeline wo
 | `Groq API Info (NotFoundError). Using Rule-Based ...` | LLM is **not** running — bad model id |
 | `Local PostgreSQL instance unauthenticated` | DB unreachable, or `greenlet` missing |
 | `Cross-encoder unavailable (ImportError)` | reranker stage skipped (see below) |
+
+Each of those degradations now also caps the confidence estimate, so a silently
+degraded pipeline can no longer report the same confidence as a healthy one.
 | `Redis connection fallback` | using the in-memory queue |
 
 ---

@@ -111,17 +111,28 @@ def render_header():
 def render_executive_summary(data: dict):
     """Render executive summary banner with status pill and confidence progress bar."""
     status = data.get("status", "UNDETERMINED").upper()
+    offense_status = (data.get("offense_status") or "").upper()
     confidence = data.get("confidence_score", 0.0) or 0.0
+    basis = data.get("confidence_basis") or {}
     domain = data.get("scenario_domain", "GENERAL_LEGAL")
     reason = data.get("reason", "No detailed reasoning provided.")
 
-    if status == "UNDETERMINED":
+    # A confident "no offence is made out" is a SUCCESS status, but showing it with
+    # the scales icon would read as though an offence had been established.
+    if offense_status == "NOT_ESTABLISHED":
+        pill_label = "NO OFFENCE ESTABLISHED"
+        status_class = "status-exonerated"
+        status_icon = "🛡️"
+    elif status == "UNDETERMINED":
+        pill_label = status
         status_class = "status-undetermined"
         status_icon = "⚠️"
     elif "EXONERAT" in status or status == "NO_OFFENSE":
+        pill_label = status
         status_class = "status-exonerated"
         status_icon = "🛡️"
     else:
+        pill_label = status
         status_class = "status-established"
         status_icon = "⚖️"
 
@@ -134,7 +145,7 @@ def render_executive_summary(data: dict):
                 <div style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase;">Legal Evaluation State</div>
                 <div style="margin: 0.8rem 0;">
                     <span class="status-pill {status_class}">
-                        {status_icon} {status}
+                        {status_icon} {pill_label}
                     </span>
                 </div>
                 <div style="font-size: 0.8rem; color: #cbd5e1;">Domain: <code>{domain}</code></div>
@@ -145,19 +156,59 @@ def render_executive_summary(data: dict):
 
     with col2:
         st.markdown("<div class=\"wls-card\">", unsafe_allow_html=True)
-        st.markdown(f"**Calibrated Confidence Score**: `{confidence:.2f} / 1.00`")
-        
-        # Color bar logic
-        if confidence >= 0.7:
-            bar_color = "green"
-        elif confidence >= 0.4:
-            bar_color = "orange"
-        else:
-            bar_color = "red"
-            
+        st.markdown(f"**Confidence Estimate**: `{confidence:.2f} / 1.00`")
         st.progress(confidence, text=f"Confidence Level: {int(confidence * 100)}%")
         st.markdown(f"**Reasoning Summary**: {reason}")
         st.markdown("</div>", unsafe_allow_html=True)
+
+        _render_confidence_basis(basis)
+
+
+COMPONENT_LABELS = {
+    "offense_support": "Offence support (elements × grounding)",
+    "retrieval": "Retrieval relevance",
+    "verification": "Verification outcome",
+    "fact_completeness": "Fact completeness",
+    "exclusion_evidence": "Exclusion evidence",
+}
+
+
+def _render_confidence_basis(basis: dict):
+    """Show what the confidence estimate was actually computed from."""
+    if not basis:
+        return
+
+    components = basis.get("components") or {}
+    caps = basis.get("caps_applied") or []
+    notes = basis.get("notes") or []
+    per_offense = basis.get("offenses") or []
+
+    if caps:
+        st.warning(
+            "Confidence capped because a pipeline stage degraded: "
+            + ", ".join(caps),
+            icon="⚠️",
+        )
+
+    with st.expander("How this confidence was calculated"):
+        if components:
+            st.markdown("##### Components")
+            for key, value in components.items():
+                label = COMPONENT_LABELS.get(key, key.replace("_", " ").title())
+                st.markdown(f"- **{label}**: `{value:.3f}`")
+
+        if per_offense:
+            st.markdown("##### Per-offence")
+            for off in per_offense:
+                st.markdown(
+                    f"- **{off.get('act_name', '')} {off.get('section_number', '')}** — "
+                    f"score `{off.get('score', 0):.3f}` "
+                    f"(elements `{off.get('element_support', 0):.2f}`, "
+                    f"grounding `{off.get('grounding', 0):.2f}`)"
+                )
+
+        for note in notes:
+            st.caption(note)
 
 
 def render_fact_matrix(facts: dict):
@@ -241,8 +292,20 @@ def render_offenses_tab(data: dict):
         bail = off.get("bailability", "N/A")
         severity = off.get("severity", "N/A")
         reasoning = off.get("legal_reasoning", "")
-        matched_elms = off.get("matched_elements", [])
-        missing_elms = off.get("missing_elements", [])
+        # element_audits is the actual schema field; the previous matched_elements /
+        # missing_elements keys never existed on the payload, so both element
+        # sections silently rendered empty on every response.
+        audits = off.get("element_audits", []) or []
+        matched_elms = [
+            a.get("element_name", "")
+            for a in audits
+            if str(a.get("status", "")).upper() == "SUPPORTED"
+        ]
+        missing_elms = [
+            f"{a.get('element_name', '')} ({a.get('status', '')})"
+            for a in audits
+            if str(a.get("status", "")).upper() in ("UNPROVEN", "CONTRADICTED_BY_FACT")
+        ]
 
         with st.expander(f"**{idx}. {title}** ({section})", expanded=(idx == 1)):
             col_a, col_b, col_c = st.columns(3)

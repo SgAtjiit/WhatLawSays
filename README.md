@@ -37,6 +37,20 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
   - Verification Agent acts as a two-part logic judge: audits factual alignment first, then audits statutory accuracy.
   - Evaluates section-specific statutory exceptions (e.g. Grave & Sudden Provocation) and general legal defences (e.g. Right of Private Defence BNS Sec 38–44).
   - Automatically exonerates accused parties if statutory elements are `CONTRADICTED_BY_FACT` (e.g. valid invitation negates criminal trespass).
+- 🔍 **Act-Scoped Two-Pass Retrieval**:
+  - The offence-identification pass searches **BNS only**. The corpus is 1,580 sections of which BNS is just 358, so an unscoped search left substantive penal law outnumbered roughly 3:1 and procedural/constitutional provisions displaced the offence sections the analyst needs.
+  - A second pass retrieves **BNSS / BSA / Constitution** separately. These populate the procedural tab only and are never candidates for the offences array.
+  - Each pool is reranked independently, and the act filter is applied inside both the dense and sparse prefetches so it shapes candidate generation rather than merely trimming the fused result.
+  - Confidence grounding is measured against the substantive pool alone, so a BNSS citation appearing in the offences array reads as ungrounded.
+- 📊 **Measured Confidence Estimation**:
+  - Confidence is computed per request from four measured components — how decisively retrieval separated a best match, the fraction of statutory elements the facts actually support, the verification outcome (discounted by retry count), and how complete the supplied facts are — combined as a weighted geometric mean.
+  - Retrieval signals are **scale-free**. Cross-encoder logits are not calibrated relevance probabilities: `BAAI/bge-reranker-base` scores this statutory corpus entirely below zero, so reading them absolutely collapsed even the correct top hit to near zero. Relevance is therefore min-max normalized within each query's candidate set, which also works unchanged for the RRF fallback.
+  - Every cited section is checked against the retrieved corpus. A section the retriever never returned caps confidence at `0.50`, since that is the strongest available hallucination signal.
+  - A silently degraded stage cannot report a healthy score: an LLM fallback caps at `0.60`, a cross-encoder fallback at `0.75`.
+  - The estimator never asserts certainty: results are bounded to `[0.05, 0.95]`.
+  - Distinguishes a confident `NOT_ESTABLISHED` (relevant law retrieved, its elements contradicted by the facts) from a low-confidence `UNDETERMINED` (weak retrieval or too many unknowns).
+  - `confidence_basis` in every response carries the full per-component and per-offence breakdown, the caps applied, and why.
+  - This is an **estimate, not a calibrated probability** — nothing here is fitted against labelled outcomes yet.
 - 📋 **Procedural Classification & Evidentiary Mapping (BNSS & BSS)**:
   - Automatically classifies offenses by **Cognizability**, **Bailability**, and **Punishment Severity** (`CAPITAL_LIFE`, `SERIOUS`, `MINOR`).
   - Maps procedural provisions under **BNSS 2023** (e.g. Sec 173 e-FIR, Sec 185 search rules) and evidentiary standards under **BSS 2023** (Sec 63 electronic records certificate).
@@ -64,14 +78,15 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │   │   └── nodes/
 │   │       ├── extractor.py     # Agent 1: Established & Allegation Fact Extractor
 │   │       ├── query_builder.py # Agent 2: Fact-Clean Query Generator
-│   │       ├── retriever.py     # Hybrid Qdrant Vector Retriever Node
+│   │       ├── retriever.py     # Act-Scoped Hybrid Retriever (offence + procedural passes)
 │   │       ├── reranker_node.py # Step 3: Legal Reranker Node
 │   │       ├── analyst.py       # Agent 3: Deductive Analyst, Exceptions & Action Mapper
 │   │       ├── verifier.py      # Agent 4: Claim-Evidence & Exception Verification Judge
-│   │       └── compiler.py      # Step 5: Response Compiler & Calibrated Confidence
+│   │       └── compiler.py      # Step 5: Response Compiler & Confidence Estimation
 │   ├── core/
 │   │   ├── vector_store.py      # Qdrant Client Hybrid Dense + BM25 Integration
 │   │   ├── reranker.py          # Reranking Engine & Fallback Manager
+│   │   ├── confidence.py        # Multi-Component Confidence Estimator
 │   │   ├── task_queue.py        # Redis Async Task Queue Producer/Consumer
 │   │   ├── database.py          # SQLAlchemy PostgreSQL Async Models & Operations
 │   │   └── logger.py            # Colorized Pipeline Stage Logging Engine
@@ -179,8 +194,22 @@ uv run python -m scripts.test_president_invitation
   "status": "UNDETERMINED",
   "scenario_domain": "POTENTIAL_CRIMINAL",
   "offense_status": "UNDETERMINED",
-  "confidence_score": 0.35,
+  "confidence_score": 0.45,
+  "confidence_basis": {
+    "score": 0.45,
+    "components": {
+      "retrieval": 0.622,
+      "exclusion_evidence": 0.25,
+      "fact_completeness": 0.84
+    },
+    "offenses": [],
+    "caps_applied": ["undetermined<=0.45"],
+    "notes": [
+      "Insufficient retrieval or fact support to determine whether an offence arises."
+    ]
+  },
   "reason": "The supplied facts do not establish the elements of an offence.",
+  "excluded_provisions": [],
   "extracted_facts": {
     "explicit_facts": [
       "A person was going to enter the President's residence",

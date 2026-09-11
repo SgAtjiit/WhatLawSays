@@ -107,11 +107,16 @@ async def analyze_scenario(payload: ScenarioRequest, request: Request):
             "extracted_facts": None,
             "candidate_chunks": [],
             "retrieved_chunks": [],
+            "candidate_procedural_chunks": [],
+            "procedural_chunks": [],
             "draft_offenses": [],
             "verification_passed": False,
             "verification_feedback": None,
             "retry_count": 0,
+            "llm_available": True,
+            "reranker_available": True,
             "confidence_score": None,
+            "confidence_basis": None,
             "final_response": None,
         }
 
@@ -138,6 +143,9 @@ async def analyze_scenario(payload: ScenarioRequest, request: Request):
             details={
                 "status": result_payload.get("status"),
                 "confidence_score": result_payload.get("confidence_score"),
+                "confidence_caps": (result_payload.get("confidence_basis") or {}).get(
+                    "caps_applied", []
+                ),
                 "offenses_count": len(result_payload.get("identified_offenses", [])),
             },
             status="SUCCESS",

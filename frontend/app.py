@@ -75,11 +75,16 @@ async def run_direct_agent_analysis(scenario_text: str, jurisdiction: str) -> di
         "extracted_facts": None,
         "candidate_chunks": [],
         "retrieved_chunks": [],
+        "candidate_procedural_chunks": [],
+        "procedural_chunks": [],
         "draft_offenses": [],
         "verification_passed": False,
         "verification_feedback": None,
         "retry_count": 0,
+        "llm_available": True,
+        "reranker_available": True,
         "confidence_score": None,
+        "confidence_basis": None,
         "final_response": None,
     }
     final_state = await legal_agent_app.ainvoke(initial_state)
