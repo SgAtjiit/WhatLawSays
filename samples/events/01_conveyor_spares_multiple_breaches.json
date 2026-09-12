@@ -1,0 +1,160 @@
+{
+  "event_id": "EVT-2291",
+  "title": "Conveyor belt spares -- Plant 1",
+  "category": "MRO",
+  "business_unit": "Plant-1",
+  "estimated_value": "600000",
+  "published_at": "2026-03-02T09:00:00",
+  "closed_at": "2026-03-06T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "V-101",
+        "name": "Alpha Traders Pvt Ltd",
+        "msme_status": "SMALL",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false,
+        "udyam_number": "UDYAM-MH-18-0042199",
+        "msme_status_as_of": "2026-01-04",
+        "gstin": "27AAACA1234A1Z5",
+        "pan": "AAACA1234A",
+        "email": "sales@alphatraders.co.in"
+      },
+      "total": "640000",
+      "currency": "INR",
+      "submitted_at": "2026-03-05T11:20:00",
+      "line_items": [
+        {
+          "code": "BELT-450",
+          "line_no": 1,
+          "description": "BELT-450",
+          "quantity": "1",
+          "unit_price": "180000",
+          "total": "180000"
+        },
+        {
+          "code": "ROLLER-90",
+          "line_no": 2,
+          "description": "ROLLER-90",
+          "quantity": "1",
+          "unit_price": "120000",
+          "total": "120000"
+        },
+        {
+          "code": "BEARING-22",
+          "line_no": 3,
+          "description": "BEARING-22",
+          "quantity": "1",
+          "unit_price": "90000",
+          "total": "90000"
+        },
+        {
+          "code": "MOTOR-5HP",
+          "line_no": 4,
+          "description": "MOTOR-5HP",
+          "quantity": "1",
+          "unit_price": "250000",
+          "total": "250000"
+        }
+      ]
+    },
+    {
+      "vendor": {
+        "vendor_id": "V-102",
+        "name": "Beta Supply Co",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false,
+        "gstin": "29AAACA1234A1Z9",
+        "email": "tenders@alphatraders.co.in"
+      },
+      "total": "641200",
+      "currency": "INR",
+      "submitted_at": "2026-03-05T11:34:00",
+      "line_items": [
+        {
+          "code": "BELT-450",
+          "line_no": 1,
+          "description": "BELT-450",
+          "quantity": "1",
+          "unit_price": "180000",
+          "total": "180000"
+        },
+        {
+          "code": "ROLLER-90",
+          "line_no": 2,
+          "description": "ROLLER-90",
+          "quantity": "1",
+          "unit_price": "120000",
+          "total": "120000"
+        },
+        {
+          "code": "BEARING-22",
+          "line_no": 3,
+          "description": "BEARING-22",
+          "quantity": "1",
+          "unit_price": "90000",
+          "total": "90000"
+        },
+        {
+          "code": "MOTOR-5HP",
+          "line_no": 4,
+          "description": "MOTOR-5HP",
+          "quantity": "1",
+          "unit_price": "251200",
+          "total": "251200"
+        }
+      ]
+    }
+  ],
+  "bids_invited": 4,
+  "award": {
+    "vendor_id": "V-101",
+    "value": "640000",
+    "decided_at": "2026-03-10T14:00:00"
+  },
+  "approvals": [
+    {
+      "approver_name": "R. Iyer",
+      "approver_role": "MANAGER",
+      "approved_at": "2026-03-12T10:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-2026-0900",
+    "vendor_id": "V-101",
+    "value": "640000",
+    "payment_terms_days": 60,
+    "has_written_agreement": true,
+    "issued_at": "2026-03-11T09:15:00",
+    "goods_accepted_at": "2026-03-28T00:00:00",
+    "linked_event_id": "EVT-2291"
+  },
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "is_listed": false,
+    "has_audit_committee": true,
+    "related_parties": []
+  },
+  "rfq_line_item_codes": [
+    "BELT-450",
+    "ROLLER-90",
+    "BEARING-22",
+    "MOTOR-5HP"
+  ],
+  "budget_line": "MRO-PLANT1-FY26",
+  "budget_remaining": "700000",
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

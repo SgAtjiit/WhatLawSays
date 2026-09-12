@@ -166,6 +166,41 @@ class LegalVectorStore:
       )
       print(f"  [+] Upserted batch {i // batch_size + 1}/{(total_docs + batch_size - 1) // batch_size} ({min(i + batch_size, total_docs)}/{total_docs} docs)...", flush=True)
 
+  async def fetch_sections(
+      self, wanted: List[tuple]
+  ) -> Dict[tuple, Dict[str, Any]]:
+    """Fetch named sections directly, by (act, section_number).
+
+    Point ids are `uuid5(namespace, "act|section")`, so a provision a citation
+    names can be retrieved exactly rather than searched for. That matters where
+    the caller already knows which section it wants: a semantic search for
+    "MSMED Act Section 15" competes against every other section of the same Act
+    and can lose, which is not a ranking problem worth solving when the identity
+    is already in hand.
+
+    Returns only what it found. A missing section is a corpus gap, and the caller
+    reports the finding without the statutory text rather than inventing it.
+    """
+    await self.ensure_initialized()
+    if not wanted:
+      return {}
+
+    ids = {
+        str(uuid.uuid5(_POINT_NAMESPACE, f"{act}|{section}")): (act, section)
+        for act, section in wanted
+    }
+    points = await self.client.retrieve(
+        collection_name=self.collection_name,
+        ids=list(ids),
+        with_payload=True,
+    )
+    found = {}
+    for point in points:
+      key = ids.get(str(point.id))
+      if key is not None:
+        found[key] = point.payload
+    return found
+
   async def hybrid_search(
       self, query_text: str, limit: int = 5, acts: Optional[List[str]] = None
   ) -> List[Dict[str, Any]]:

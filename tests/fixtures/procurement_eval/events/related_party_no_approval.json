@@ -1,0 +1,88 @@
+{
+  "event_id": "EV-05",
+  "title": "Facility management",
+  "category": "SERVICES",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "E-1",
+        "name": "Nord Industrial Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": true,
+        "processes_personal_data": true,
+        "has_data_processing_agreement": false
+      },
+      "total": "2400000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-10T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "E-2",
+        "name": "Kavach Engineering",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "2856000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-11T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "E-3",
+        "name": "Deccan Works Pvt Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "3384000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-12T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "E-1",
+    "value": "2400000",
+    "decided_at": "2026-03-18T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-03-17T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-05",
+    "vendor_id": "E-1",
+    "value": "2400000",
+    "payment_terms_days": 30,
+    "has_written_agreement": true,
+    "issued_at": "2026-03-20T00:00:00"
+  },
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": true,
+    "related_parties": [
+      "E-1"
+    ],
+    "is_listed": true
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

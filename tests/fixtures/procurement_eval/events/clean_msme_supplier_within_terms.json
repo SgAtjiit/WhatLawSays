@@ -1,0 +1,111 @@
+{
+  "event_id": "EV-14",
+  "title": "Machined parts",
+  "category": "DIRECT",
+  "published_at": "2026-06-01T09:00:00",
+  "closed_at": "2026-06-20T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "N-1",
+        "name": "Nord Industrial Ltd",
+        "msme_status": "SMALL",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false,
+        "udyam_number": "UDYAM-GJ-03-0099"
+      },
+      "total": "1250000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-10T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "N-2",
+        "name": "Kavach Engineering",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1487500",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-11T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "N-3",
+        "name": "Deccan Works Pvt Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1762500",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-12T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "N-1",
+    "value": "1250000",
+    "decided_at": "2026-06-25T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-06-24T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-14",
+    "vendor_id": "N-1",
+    "value": "1250000",
+    "payment_terms_days": 45,
+    "has_written_agreement": true,
+    "issued_at": "2026-06-26T00:00:00",
+    "line_items": [
+      {
+        "code": "MCH-A",
+        "line_no": 1,
+        "description": "MCH-A",
+        "quantity": "1",
+        "unit_price": "700000",
+        "total": "700000"
+      },
+      {
+        "code": "MCH-B",
+        "line_no": 2,
+        "description": "MCH-B",
+        "quantity": "1",
+        "unit_price": "550000",
+        "total": "550000"
+      }
+    ]
+  },
+  "rfq_line_item_codes": [
+    "MCH-A",
+    "MCH-B"
+  ],
+  "budget_line": "DIR-FY26",
+  "budget_remaining": "1400000",
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

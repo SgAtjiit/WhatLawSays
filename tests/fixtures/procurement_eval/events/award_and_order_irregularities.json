@@ -1,0 +1,118 @@
+{
+  "event_id": "EV-09",
+  "title": "Switchgear",
+  "category": "CAPEX",
+  "published_at": "2026-03-01T09:00:00",
+  "closed_at": "2026-03-09T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "I-1",
+        "name": "Highline Electric",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1200000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-05T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "I-2",
+        "name": "Budget Power Systems",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "980000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-06T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "I-3",
+        "name": "Volt Systems Pvt Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1410000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-07T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "I-1",
+    "value": "1200000",
+    "decided_at": "2026-03-14T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-03-13T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-09",
+    "vendor_id": "I-1",
+    "value": "1320000",
+    "payment_terms_days": 30,
+    "has_written_agreement": true,
+    "issued_at": "2026-03-20T00:00:00",
+    "line_items": [
+      {
+        "code": "SWG-11KV",
+        "line_no": 1,
+        "description": "SWG-11KV",
+        "quantity": "1",
+        "unit_price": "600000",
+        "total": "600000"
+      },
+      {
+        "code": "PANEL-A",
+        "line_no": 2,
+        "description": "PANEL-A",
+        "quantity": "1",
+        "unit_price": "500000",
+        "total": "500000"
+      },
+      {
+        "code": "EXTRA-CABLE",
+        "line_no": 3,
+        "description": "EXTRA-CABLE",
+        "quantity": "1",
+        "unit_price": "220000",
+        "total": "220000"
+      }
+    ]
+  },
+  "rfq_line_item_codes": [
+    "SWG-11KV",
+    "PANEL-A"
+  ],
+  "budget_line": "CAPEX-EL-FY26",
+  "budget_remaining": "1000000",
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

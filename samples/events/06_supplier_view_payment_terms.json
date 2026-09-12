@@ -1,0 +1,60 @@
+{
+  "event_id": "EVT-2480",
+  "title": "Precision machined components",
+  "category": "DIRECT",
+  "estimated_value": "1250000",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "V-601",
+        "name": "Sharda Precision Works",
+        "msme_status": "MICRO",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false,
+        "udyam_number": "UDYAM-GJ-03-0011884",
+        "msme_status_as_of": "2025-11-20"
+      },
+      "total": "1250000",
+      "currency": "INR",
+      "is_responsive": true,
+      "payment_terms_days": 45
+    }
+  ],
+  "award": {
+    "vendor_id": "V-601",
+    "value": "1250000",
+    "decided_at": "2026-07-15T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-07-14T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-2026-1501",
+    "vendor_id": "V-601",
+    "value": "1250000",
+    "payment_terms_days": 90,
+    "has_written_agreement": true,
+    "issued_at": "2026-07-16T00:00:00",
+    "goods_accepted_at": "2026-08-20T00:00:00"
+  },
+  "company_profile": {
+    "entity_name": "Northline Auto Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

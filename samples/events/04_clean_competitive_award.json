@@ -1,0 +1,203 @@
+{
+  "event_id": "EVT-2402",
+  "title": "Industrial lubricants -- annual",
+  "category": "MRO",
+  "business_unit": "Plant-2",
+  "estimated_value": "820000",
+  "published_at": "2026-06-01T09:00:00",
+  "closed_at": "2026-06-15T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "V-401",
+        "name": "Nord Lubricants Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "790000",
+      "currency": "INR",
+      "submitted_at": "2026-06-12T11:00:00",
+      "is_responsive": true,
+      "payment_terms_days": 45,
+      "line_items": [
+        {
+          "code": "LUB-EP90",
+          "line_no": 1,
+          "description": "LUB-EP90",
+          "quantity": "1",
+          "unit_price": "310000",
+          "total": "310000"
+        },
+        {
+          "code": "LUB-HY46",
+          "line_no": 2,
+          "description": "LUB-HY46",
+          "quantity": "1",
+          "unit_price": "280000",
+          "total": "280000"
+        },
+        {
+          "code": "GRS-LT2",
+          "line_no": 3,
+          "description": "GRS-LT2",
+          "quantity": "1",
+          "unit_price": "200000",
+          "total": "200000"
+        }
+      ]
+    },
+    {
+      "vendor": {
+        "vendor_id": "V-402",
+        "name": "Kavach Petrochem",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "845000",
+      "currency": "INR",
+      "submitted_at": "2026-06-13T15:30:00",
+      "is_responsive": true,
+      "line_items": [
+        {
+          "code": "LUB-EP90",
+          "line_no": 1,
+          "description": "LUB-EP90",
+          "quantity": "1",
+          "unit_price": "335000",
+          "total": "335000"
+        },
+        {
+          "code": "LUB-HY46",
+          "line_no": 2,
+          "description": "LUB-HY46",
+          "quantity": "1",
+          "unit_price": "295000",
+          "total": "295000"
+        },
+        {
+          "code": "GRS-LT2",
+          "line_no": 3,
+          "description": "GRS-LT2",
+          "quantity": "1",
+          "unit_price": "215000",
+          "total": "215000"
+        }
+      ]
+    },
+    {
+      "vendor": {
+        "vendor_id": "V-403",
+        "name": "Deccan Oils Pvt Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "902000",
+      "currency": "INR",
+      "submitted_at": "2026-06-14T10:10:00",
+      "is_responsive": true,
+      "line_items": [
+        {
+          "code": "LUB-EP90",
+          "line_no": 1,
+          "description": "LUB-EP90",
+          "quantity": "1",
+          "unit_price": "358000",
+          "total": "358000"
+        },
+        {
+          "code": "LUB-HY46",
+          "line_no": 2,
+          "description": "LUB-HY46",
+          "quantity": "1",
+          "unit_price": "314000",
+          "total": "314000"
+        },
+        {
+          "code": "GRS-LT2",
+          "line_no": 3,
+          "description": "GRS-LT2",
+          "quantity": "1",
+          "unit_price": "230000",
+          "total": "230000"
+        }
+      ]
+    }
+  ],
+  "bids_invited": 4,
+  "award": {
+    "vendor_id": "V-401",
+    "value": "790000",
+    "decided_at": "2026-06-20T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_name": "P. Nandy",
+      "approver_role": "CFO",
+      "approved_at": "2026-06-19T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-2026-1288",
+    "vendor_id": "V-401",
+    "value": "790000",
+    "payment_terms_days": 45,
+    "has_written_agreement": true,
+    "issued_at": "2026-06-21T00:00:00",
+    "linked_event_id": "EVT-2402",
+    "line_items": [
+      {
+        "code": "LUB-EP90",
+        "line_no": 1,
+        "description": "LUB-EP90",
+        "quantity": "1",
+        "unit_price": "310000",
+        "total": "310000"
+      },
+      {
+        "code": "LUB-HY46",
+        "line_no": 2,
+        "description": "LUB-HY46",
+        "quantity": "1",
+        "unit_price": "280000",
+        "total": "280000"
+      },
+      {
+        "code": "GRS-LT2",
+        "line_no": 3,
+        "description": "GRS-LT2",
+        "quantity": "1",
+        "unit_price": "200000",
+        "total": "200000"
+      }
+    ]
+  },
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "rfq_line_item_codes": [
+    "LUB-EP90",
+    "LUB-HY46",
+    "GRS-LT2"
+  ],
+  "budget_line": "MRO-PLANT2-FY26",
+  "budget_remaining": "900000",
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

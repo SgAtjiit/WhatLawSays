@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from src.api.v1.endpoints import contracts
+from src.api.v1.endpoints import contracts, procurement
 
 api_router = APIRouter()
 
@@ -8,3 +8,4 @@ api_router = APIRouter()
 # two implementations of the same route -- the divergence its own comment warns
 # about, where the two entry points scored the same scenario differently.
 api_router.include_router(contracts.router)
+api_router.include_router(procurement.router)

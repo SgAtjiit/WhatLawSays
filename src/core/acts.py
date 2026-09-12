@@ -55,3 +55,30 @@ CONTRACT_ACTS = [
     ACT_DPDP,
     ACT_TRANSFER_OF_PROPERTY,
 ]
+
+# Procurement compliance draws on a fourth pool. These three Acts carry the
+# provisions an award actually turns on, and none of them was needed by either
+# earlier pipeline: MSMED Chapter V governs what a buyer may agree to pay a small
+# supplier and when, the Competition Act defines bid rigging, and the Companies
+# Act governs awarding work to a related party.
+#
+# As with ACT_DPDP, these strings are India Code's own rendering of each short
+# title and are matched verbatim against the Qdrant `act` payload. They were
+# copied from the harvested JSON rather than typed.
+ACT_MSMED = (
+    "The Micro, Small and Medium Enterprises Development Act, 2006 (MSMED Act)"
+)
+ACT_COMPETITION = "The Competition Act, 2002 (Competition Act)"
+ACT_COMPANIES = "The Companies Act, 2013 (Companies Act)"
+
+# The Contract Act and the DPDP Act appear here as well as in CONTRACT_ACTS: a
+# purchase order is a contract, and a vendor handling personal data raises the
+# same obligations whichever pipeline is asking. A pool is a retrieval filter,
+# not an ownership claim, so an Act may sit in more than one.
+PROCUREMENT_ACTS = [
+    ACT_MSMED,
+    ACT_COMPETITION,
+    ACT_COMPANIES,
+    ACT_CONTRACT,
+    ACT_DPDP,
+]

@@ -237,3 +237,197 @@ async def get_db() -> AsyncSession:
             yield session
         finally:
             await session.close()
+
+class ProcurementPolicyRecord(Base):
+    """A procurement policy document and the rule set compiled from it.
+
+    `document_text` is retained for the same reason `ContractDocumentRecord`
+    retains it: every rule drafted from this document carries a quote and offsets
+    into it, and without the text those offsets cannot be re-verified. A rule
+    whose grounding cannot be checked is exactly what the ratification step
+    exists to prevent.
+
+    Versions are immutable once activated. An edit produces a new version rather
+    than mutating this one, so a review run six months ago stays re-derivable
+    against the rules that actually produced it.
+    """
+
+    __tablename__ = "procurement_policies"
+
+    policy_id = Column(String(64), primary_key=True, index=True)
+    company_id = Column(String(128), nullable=True, index=True)
+    org_label = Column(String(512), nullable=True)
+    filename = Column(String(512), nullable=True)
+    media_type = Column(String(128), nullable=True)
+    version = Column(Integer, nullable=False, default=1)
+    supersedes = Column(String(64), nullable=True)
+    status = Column(String(32), nullable=False, default="DRAFT")
+    document_text = Column(Text, nullable=True)
+    rule_count = Column(Integer, nullable=True)
+    ratified_rule_count = Column(Integer, nullable=True)
+    rule_set = Column(JSON, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AwardReviewRecord(Base):
+    """A sourcing event and the compliance review derived from it.
+
+    `event_snapshot` is required for the same reason a contract's text is: every
+    finding indexes into it by field path, and without the snapshot a stored
+    finding cannot be re-derived. An unverifiable finding is what this pipeline
+    exists to prevent, so the data it rested on has to survive with it.
+
+    Bid tabs carry vendor pricing, PAN and bank details, which is commercially
+    sensitive in the same way a contract carries salaries -- so `delete` removes
+    the row outright rather than flagging it hidden.
+    """
+
+    __tablename__ = "award_reviews"
+
+    review_id = Column(String(64), primary_key=True, index=True)
+    event_id = Column(String(128), nullable=True, index=True)
+    policy_id = Column(String(64), nullable=True)
+    policy_version = Column(Integer, nullable=True)
+    side = Column(String(16), nullable=True)
+    status = Column(String(32), nullable=False, default="QUEUED")
+    error = Column(Text, nullable=True)
+    event_snapshot = Column(JSON, nullable=True)
+    po_filename = Column(String(512), nullable=True)
+    po_document_text = Column(Text, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    overall_status = Column(String(48), nullable=True)
+    overall_risk = Column(String(16), nullable=True)
+    review = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# Same bounded fallbacks as `_MEMORY_CONTRACTS`, and used only while PostgreSQL
+# is unreachable. An award file carries vendor pricing and bank details, so an
+# unbounded in-process copy would be the same mistake twice.
+_MEMORY_POLICIES: Dict[str, Dict[str, Any]] = {}
+_MEMORY_REVIEWS: Dict[str, Dict[str, Any]] = {}
+
+
+def _remember_in(store: Dict[str, Dict[str, Any]], key: str, record: Dict[str, Any]) -> None:
+    store[key] = {**store.get(key, {}), **record}
+    while len(store) > _MEMORY_LIMIT:
+        store.pop(next(iter(store)))
+
+
+async def _save(model, key_field: str, store, record: Dict[str, Any], update_only: bool) -> bool:
+    key = record[key_field]
+    if update_only:
+        try:
+            async with AsyncSessionLocal() as session:
+                exists = (await session.get(model, key)) is not None
+        except Exception:
+            exists = key in store
+        if not exists:
+            return False
+    record = _fit(record)
+    try:
+        async with AsyncSessionLocal() as session:
+            existing = await session.get(model, key)
+            if existing is None:
+                session.add(model(**record))
+            else:
+                for name, value in record.items():
+                    setattr(existing, name, value)
+                existing.updated_at = datetime.datetime.utcnow()
+            await session.commit()
+        store.pop(key, None)
+    except Exception as e:
+        _remember_in(store, key, record)
+        pipeline_logger.log_step(
+            "POSTGRESQL DB",
+            f"{model.__tablename__} [{key}] held in the in-memory store "
+            f"(PostgreSQL write failed: {type(e).__name__}: {str(e)[:160]})",
+            status="WARNING",
+        )
+    return True
+
+
+async def _get(model, key: str, store) -> Optional[Dict[str, Any]]:
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.get(model, key)
+    except Exception:
+        # Only an unreachable database falls through. A database that answered
+        # "no such row" is believed, so a record deleted out of band is not
+        # served back out of memory.
+        return store.get(key)
+    if row is None:
+        return None
+    return {c.name: getattr(row, c.name) for c in model.__table__.columns}
+
+
+async def _delete(model, key: str, store) -> bool:
+    removed = store.pop(key, None) is not None
+    try:
+        async with AsyncSessionLocal() as session:
+            row = await session.get(model, key)
+            if row is not None:
+                await session.delete(row)
+                await session.commit()
+                removed = True
+    except Exception:
+        pass
+    return removed
+
+
+async def save_policy(record: Dict[str, Any], *, update_only: bool = False) -> bool:
+    return await _save(ProcurementPolicyRecord, "policy_id", _MEMORY_POLICIES, record, update_only)
+
+
+async def get_policy(policy_id: str) -> Optional[Dict[str, Any]]:
+    return await _get(ProcurementPolicyRecord, policy_id, _MEMORY_POLICIES)
+
+
+async def delete_policy(policy_id: str) -> bool:
+    return await _delete(ProcurementPolicyRecord, policy_id, _MEMORY_POLICIES)
+
+
+async def save_award_review(record: Dict[str, Any], *, update_only: bool = False) -> bool:
+    return await _save(AwardReviewRecord, "review_id", _MEMORY_REVIEWS, record, update_only)
+
+
+async def get_award_review(review_id: str) -> Optional[Dict[str, Any]]:
+    return await _get(AwardReviewRecord, review_id, _MEMORY_REVIEWS)
+
+
+async def delete_award_review(review_id: str) -> bool:
+    return await _delete(AwardReviewRecord, review_id, _MEMORY_REVIEWS)
+
+
+async def list_policies(limit: int = 50) -> list:
+    """Recent policies, newest first. Used to populate the policy selector."""
+    try:
+        from sqlalchemy import select
+
+        async with AsyncSessionLocal() as session:
+            rows = await session.execute(
+                select(ProcurementPolicyRecord)
+                .order_by(ProcurementPolicyRecord.updated_at.desc())
+                .limit(limit)
+            )
+            return [
+                {
+                    "policy_id": r.policy_id, "org_label": r.org_label, "version": r.version,
+                    "status": r.status, "rule_count": r.rule_count,
+                    "ratified_rule_count": r.ratified_rule_count,
+                }
+                for r in rows.scalars()
+            ]
+    except Exception:
+        return [
+            {
+                "policy_id": p.get("policy_id"), "org_label": p.get("org_label"),
+                "version": p.get("version"), "status": p.get("status"),
+                "rule_count": p.get("rule_count"),
+                "ratified_rule_count": p.get("ratified_rule_count"),
+            }
+            for p in _MEMORY_POLICIES.values()
+        ][:limit]

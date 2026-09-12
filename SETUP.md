@@ -140,10 +140,11 @@ Without them `settings.CONTRACT_LLM_CONCURRENCY` raises and every contract revie
 
 ## 6. Seed the legal corpus
 
-Indexes 2336 sections (BNS, BNSS, BSA, Constitution, IT Act, POSH Act, and the
-contract pool: Contract Act, TPA, CPA, Arbitration Act, SRA, DPDP Act). Point ids are
-derived from act + section, so re-running is idempotent. The first run downloads the
-`bge-small-en-v1.5` and `Qdrant/bm25` ONNX models. Takes ~2 minutes.
+Indexes 2894 sections across fifteen Acts: the criminal pool (BNS, BNSS, BSA,
+Constitution, IT Act, POSH Act), the contract pool (Contract Act, TPA, CPA, Arbitration
+Act, SRA, DPDP Act) and the procurement pool (MSMED Act, Competition Act, Companies Act).
+Point ids are derived from act + section, so re-running is idempotent. The first run
+downloads the `bge-small-en-v1.5` and `Qdrant/bm25` ONNX models. Takes ~4 minutes.
 
 ```bash
 uv run python -m scripts.ingest_legal_corpus
@@ -154,8 +155,24 @@ Verify:
 ```bash
 curl -s http://localhost:6333/collections/whatlawsays_legal_corpus \
   | python3 -c "import sys,json; d=json.load(sys.stdin)['result']; print(d['points_count'], d['status'])"
-# -> 2336 green
+# -> 2894 green
 ```
+
+### Re-harvesting an Act
+
+The three procurement Acts were harvested from India Code with the scripts already in
+the repo. To refresh them, or to add another Act:
+
+```bash
+uv run python scripts/find_indiacode_act.py "Competition Act"     # -> act_id
+uv run python scripts/fetch_indiacode_act.py <act_id> "<Short Tag>" data/<file>.json
+```
+
+Then add the file to `corpus_files` in `scripts/ingest_legal_corpus.py` and the canonical
+act string to `src/core/acts.py`. **Copy that string out of the harvested JSON rather than
+typing it** — the strings are matched verbatim against the Qdrant `act` payload, and
+`ACT_DPDP` carries a trailing period because India Code renders the short title that way.
+Tidying it silently empties the filter.
 
 ## 7. Run it (two terminals)
 
@@ -301,4 +318,60 @@ still moves the right way when a review is degraded:
 ```bash
 uv run python -m scripts.evaluate_contract_review --verbose
 uv run python -m scripts.calibrate_confidence --verbose
+```
+
+
+---
+
+## Procurement compliance
+
+Check an award against a procurement policy and Indian statute. No worker is needed —
+the compliance work is deterministic and the write-up is a single LLM call.
+
+```bash
+uv run uvicorn src.main:app --reload             # API, including /api/v1/awards
+uv run streamlit run frontend/app.py             # pages 3 (Policy Library) and 4 (Award Review)
+uv run python scripts/generate_sample_events.py  # six demo events in samples/events/
+```
+
+The fastest way to see it work is the UI: open **🧾 Award Review**, click
+*Conveyor Spares Multiple Breaches*, and press Review. With no policy selected it runs
+statute only and caps confidence at 0.70, which is the point — it cannot speak to a
+process it was never told about.
+
+From the shell, build a policy, ratify it, and review against it:
+
+```bash
+POLICY=$(curl -s -X POST http://localhost:8000/api/v1/policies \
+  -H 'content-type: application/json' \
+  -d '{"org_label":"Acme","rules":[
+        {"rule_id":"R1","kind":"MIN_QUOTES_BY_VALUE",
+         "params":{"above_value":500000,"min_quotes":3},"status":"DRAFT"}]}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["policy_id"])')
+
+curl -s -X PATCH "http://localhost:8000/api/v1/policies/$POLICY/rules/R1" \
+  -H 'content-type: application/json' -d '{"action":"RATIFY","actor":"you"}' > /dev/null
+curl -s -X POST "http://localhost:8000/api/v1/policies/$POLICY/activate" > /dev/null
+
+# `<` not `@`: the event travels as a form field, not as a file upload.
+curl -s -X POST http://localhost:8000/api/v1/awards \
+  -F "event=<samples/events/01_conveyor_spares_multiple_breaches.json" \
+  -F "policy_id=$POLICY" -F "side=BUYER" | python3 -m json.tool | head -40
+```
+
+Activation is refused while any rule is still DRAFT, and an activated version is
+immutable — a rule nobody confirmed is this system's reading of your policy, not your
+policy, and a review from six months ago has to stay re-derivable against the rules that
+actually produced it.
+
+`provided_collections` is required on every event. It names which parts you actually
+supplied, so an omitted `approvals` array is reported as a gap rather than treated as an
+award nobody approved. A payload without it is refused with a 422 rather than reviewed.
+
+Score the checks against the labelled events, and confirm the confidence score still
+moves the right way when a review is degraded:
+
+```bash
+uv run python -m scripts.evaluate_procurement_review --verbose
+uv run python -m scripts.calibrate_procurement_confidence --verbose
 ```

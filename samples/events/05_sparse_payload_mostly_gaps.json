@@ -1,0 +1,28 @@
+{
+  "event_id": "EVT-2450",
+  "title": "Transformer overhaul",
+  "category": "SERVICES",
+  "estimated_value": "1800000",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "V-501",
+        "name": "Powergrid Services",
+        "msme_status": "UNKNOWN",
+        "on_approved_list": null,
+        "is_related_party": null,
+        "processes_personal_data": null
+      },
+      "total": "1800000",
+      "currency": "INR"
+    }
+  ],
+  "award": {
+    "vendor_id": "V-501",
+    "value": "1800000",
+    "decided_at": "2026-07-04T00:00:00"
+  },
+  "provided_collections": [
+    "bids"
+  ]
+}

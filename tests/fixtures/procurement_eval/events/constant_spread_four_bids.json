@@ -1,0 +1,100 @@
+{
+  "event_id": "EV-16",
+  "title": "Steel plate",
+  "category": "DIRECT",
+  "published_at": "2026-08-01T09:00:00",
+  "closed_at": "2026-08-15T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "P-1",
+        "name": "Ferro Steels",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1000000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-08-10T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "P-2",
+        "name": "Ispat Traders",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1050000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-08-11T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "P-3",
+        "name": "Metalix Pvt Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1102500",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-08-12T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "P-4",
+        "name": "Girder Supply Co",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "1157625",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-08-13T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "P-1",
+    "value": "1000000",
+    "decided_at": "2026-08-20T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-08-19T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-16",
+    "vendor_id": "P-1",
+    "value": "1000000",
+    "payment_terms_days": 45,
+    "has_written_agreement": true,
+    "issued_at": "2026-08-21T00:00:00"
+  },
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

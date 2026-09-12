@@ -1,0 +1,240 @@
+{
+  "msmed_term_60_days": {
+    "clean": false,
+    "expected": [
+      [
+        "MSMED_TERM_EXCEEDS_STATUTORY_CAP",
+        "A-1",
+        "BREACH"
+      ],
+      [
+        "MSMED_PAYMENT_OVERDUE",
+        "A-1",
+        "BREACH"
+      ],
+      [
+        "MSMED_INTEREST_QUANTUM",
+        "A-1",
+        "UNDETERMINED"
+      ]
+    ]
+  },
+  "msmed_no_written_agreement": {
+    "clean": false,
+    "expected": [
+      [
+        "MSMED_TERM_EXCEEDS_STATUTORY_CAP",
+        "B-1",
+        "BREACH"
+      ]
+    ]
+  },
+  "msmed_status_unknown": {
+    "clean": false,
+    "expected": [
+      [
+        "MSMED_TERM_EXCEEDS_STATUTORY_CAP",
+        "C-1",
+        "UNDETERMINED"
+      ],
+      [
+        "PAYMENT_TERMS_CAP",
+        null,
+        "BREACH"
+      ]
+    ]
+  },
+  "msmed_medium_enterprise_not_applicable": {
+    "clean": false,
+    "expected": [
+      [
+        "MSMED_TERM_EXCEEDS_STATUTORY_CAP",
+        "D-1",
+        "NOT_APPLICABLE"
+      ]
+    ]
+  },
+  "related_party_no_approval": {
+    "clean": false,
+    "expected": [
+      [
+        "RELATED_PARTY_AWARD_UNAPPROVED",
+        "E-1",
+        "BREACH"
+      ],
+      [
+        "RELATED_PARTY_AUDIT_COMMITTEE_APPROVAL",
+        "E-1",
+        "BREACH"
+      ],
+      [
+        "VENDOR_PROCESSES_DATA_WITHOUT_DPA",
+        "E-1",
+        "BREACH"
+      ]
+    ]
+  },
+  "related_party_no_company_profile": {
+    "clean": false,
+    "expected": [
+      [
+        "RELATED_PARTY_AWARD_UNAPPROVED",
+        "F-1",
+        "UNDETERMINED"
+      ],
+      [
+        "RELATED_PARTY_AUDIT_COMMITTEE_APPROVAL",
+        "F-1",
+        "UNDETERMINED"
+      ]
+    ]
+  },
+  "policy_quotes_approval_and_retro_po": {
+    "clean": false,
+    "expected": [
+      [
+        "MIN_QUOTES_BY_VALUE",
+        null,
+        "BREACH"
+      ],
+      [
+        "APPROVAL_AUTHORITY",
+        null,
+        "BREACH"
+      ],
+      [
+        "APPROVAL_BEFORE_COMMITMENT",
+        null,
+        "BREACH"
+      ]
+    ]
+  },
+  "split_orders_structuring": {
+    "clean": false,
+    "expected": [
+      [
+        "SPLIT_PO_AVOIDANCE",
+        "H-1",
+        "BREACH"
+      ]
+    ]
+  },
+  "award_and_order_irregularities": {
+    "clean": false,
+    "expected": [
+      [
+        "LOWEST_RESPONSIVE_AWARD",
+        "I-1",
+        "BREACH"
+      ],
+      [
+        "PO_EXCEEDS_AWARDED_VALUE",
+        null,
+        "BREACH"
+      ],
+      [
+        "SCOPE_DRIFT",
+        "EXTRA-CABLE",
+        "BREACH"
+      ],
+      [
+        "BUDGET_AVAILABILITY",
+        null,
+        "BREACH"
+      ]
+    ]
+  },
+  "process_irregularities": {
+    "clean": false,
+    "expected": [
+      [
+        "LATE_BID_REJECTION",
+        "J-1",
+        "BREACH"
+      ],
+      [
+        "MANDATORY_BID_WINDOW",
+        null,
+        "BREACH"
+      ],
+      [
+        "APPROVED_VENDOR_REQUIRED",
+        "J-1",
+        "BREACH"
+      ],
+      [
+        "SINGLE_SOURCE_JUSTIFICATION",
+        null,
+        "BREACH"
+      ]
+    ]
+  },
+  "bid_integrity_signals": {
+    "clean": false,
+    "expected": [
+      [
+        "NEAR_IDENTICAL_TOTALS",
+        "K-1,K-2",
+        "INDICATOR"
+      ],
+      [
+        "IDENTICAL_UNIT_PRICES",
+        "K-1,K-2",
+        "INDICATOR"
+      ],
+      [
+        "SHARED_IDENTIFIERS",
+        "K-1,K-2",
+        "INDICATOR"
+      ],
+      [
+        "COVER_BIDDING",
+        "K-3",
+        "INDICATOR"
+      ]
+    ]
+  },
+  "rotation_and_single_responsive": {
+    "clean": false,
+    "expected": [
+      [
+        "ROTATING_WINNERS",
+        null,
+        "INDICATOR"
+      ],
+      [
+        "SINGLE_RESPONSIVE_BID",
+        "L-1",
+        "INDICATOR"
+      ]
+    ]
+  },
+  "clean_competitive_award": {
+    "clean": true,
+    "expected": [
+      [
+        "RATE_CONTRACT_ADHERENCE",
+        "LUB-A,LUB-B",
+        "UNDETERMINED"
+      ]
+    ]
+  },
+  "clean_msme_supplier_within_terms": {
+    "clean": true,
+    "expected": []
+  },
+  "clean_single_source_justified": {
+    "clean": true,
+    "expected": []
+  },
+  "constant_spread_four_bids": {
+    "clean": false,
+    "expected": [
+      [
+        "CONSTANT_SPREAD",
+        null,
+        "INDICATOR"
+      ]
+    ]
+  }
+}

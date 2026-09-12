@@ -1,0 +1,56 @@
+{
+  "event_id": "EV-07",
+  "title": "Pumps",
+  "category": "MRO",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "G-1",
+        "name": "Single Source Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "640000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-03-10T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "G-1",
+    "value": "640000",
+    "decided_at": "2026-03-18T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "MANAGER",
+      "approved_at": "2026-03-22T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-07",
+    "vendor_id": "G-1",
+    "value": "640000",
+    "payment_terms_days": 30,
+    "has_written_agreement": true,
+    "issued_at": "2026-03-20T00:00:00"
+  },
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

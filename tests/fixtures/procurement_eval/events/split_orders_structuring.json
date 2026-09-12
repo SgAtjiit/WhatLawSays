@@ -1,0 +1,70 @@
+{
+  "event_id": "EV-08",
+  "title": "Racking phase 3",
+  "category": "CAPEX",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "H-1",
+        "name": "Sterling Storage",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "480000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-04-08T10:00:00"
+    }
+  ],
+  "award": {
+    "vendor_id": "H-1",
+    "value": "480000",
+    "decided_at": "2026-04-12T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "MANAGER",
+      "approved_at": "2026-04-11T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-08",
+    "vendor_id": "H-1",
+    "value": "480000",
+    "payment_terms_days": 30,
+    "has_written_agreement": true,
+    "issued_at": "2026-04-12T00:00:00"
+  },
+  "prior_awards": [
+    {
+      "vendor_id": "H-1",
+      "category": "CAPEX",
+      "value": "470000",
+      "decided_at": "2026-03-28T00:00:00"
+    },
+    {
+      "vendor_id": "H-1",
+      "category": "CAPEX",
+      "value": "465000",
+      "decided_at": "2026-04-02T00:00:00"
+    }
+  ],
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

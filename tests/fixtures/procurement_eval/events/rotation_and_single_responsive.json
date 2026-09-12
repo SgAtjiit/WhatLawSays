@@ -1,0 +1,114 @@
+{
+  "event_id": "EV-12",
+  "title": "Painting contract",
+  "category": "SERVICES",
+  "published_at": "2026-05-01T09:00:00",
+  "closed_at": "2026-05-15T17:00:00",
+  "bids": [
+    {
+      "vendor": {
+        "vendor_id": "L-1",
+        "name": "Colourfast Ltd",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "500000",
+      "currency": "INR",
+      "is_responsive": true,
+      "submitted_at": "2026-05-10T10:00:00"
+    },
+    {
+      "vendor": {
+        "vendor_id": "L-2",
+        "name": "Brushline Co",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "480000",
+      "currency": "INR",
+      "is_responsive": false,
+      "submitted_at": "2026-05-11T10:00:00",
+      "disqualified_reason": "no EMD"
+    },
+    {
+      "vendor": {
+        "vendor_id": "L-3",
+        "name": "Coatwell Services",
+        "msme_status": "NOT_MSME",
+        "on_approved_list": true,
+        "is_related_party": false,
+        "processes_personal_data": false
+      },
+      "total": "495000",
+      "currency": "INR",
+      "is_responsive": false,
+      "submitted_at": "2026-05-12T10:00:00",
+      "disqualified_reason": "late licence"
+    }
+  ],
+  "award": {
+    "vendor_id": "L-1",
+    "value": "500000",
+    "decided_at": "2026-05-20T00:00:00"
+  },
+  "approvals": [
+    {
+      "approver_role": "CFO",
+      "approved_at": "2026-05-19T00:00:00",
+      "stage": "AWARD"
+    }
+  ],
+  "purchase_order": {
+    "po_number": "PO-12",
+    "vendor_id": "L-1",
+    "value": "500000",
+    "payment_terms_days": 30,
+    "has_written_agreement": true,
+    "issued_at": "2026-05-21T00:00:00"
+  },
+  "prior_awards": [
+    {
+      "vendor_id": "L-2",
+      "category": "SERVICES",
+      "value": "1",
+      "decided_at": "2026-01-10T00:00:00"
+    },
+    {
+      "vendor_id": "L-3",
+      "category": "SERVICES",
+      "value": "1",
+      "decided_at": "2026-02-10T00:00:00"
+    },
+    {
+      "vendor_id": "L-1",
+      "category": "SERVICES",
+      "value": "1",
+      "decided_at": "2026-03-10T00:00:00"
+    },
+    {
+      "vendor_id": "L-2",
+      "category": "SERVICES",
+      "value": "1",
+      "decided_at": "2026-04-10T00:00:00"
+    }
+  ],
+  "company_profile": {
+    "entity_name": "Acme Manufacturing Ltd",
+    "has_audit_committee": false,
+    "related_parties": []
+  },
+  "provided_collections": [
+    "bids",
+    "approvals",
+    "purchase_order",
+    "company_profile",
+    "vendor_msme_status",
+    "prior_awards",
+    "rfq_line_item_codes",
+    "budget"
+  ]
+}

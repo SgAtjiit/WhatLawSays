@@ -81,6 +81,10 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │   │   ├── contract_nodes/      # profiler, classifier, query_builder, retriever,
 │   │   │                        # explainer, red_flag_analyst, gap_detector,
 │   │   │                        # consistency, grounding, compiler
+│   │   ├── procurement_graph.py   # Third LangGraph: procurement compliance
+│   │   ├── procurement_state.py   # TypedDict ProcurementGraphState
+│   │   ├── procurement_nodes/     # profiler, statute_retriever, narrator,
+│   │   │                          # narrative_verifier, compiler
 │   │   └── nodes/
 │   │       ├── extractor.py     # Agent 1: Established & Allegation Fact Extractor
 │   │       ├── query_builder.py # Agent 2: Fact-Clean Query Generator
@@ -94,6 +98,12 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │   │   ├── document_parser.py   # Contract upload -> normalized text with offsets
 │   │   ├── clause_segmenter.py  # Contract text -> clauses, with deterministic labels
 │   │   ├── red_flag_rules.py    # Deterministic red-flag rules, each carrying citations
+│   │   ├── procurement_rules.py # Statutory checks + the 14 policy templates
+│   │   ├── procurement_evidence.py # Path resolver, computation registry, verifier
+│   │   ├── bid_integrity.py     # Collusion-pattern statistics, reported as indicators
+│   │   ├── procurement_confidence.py # Procurement-review confidence estimator
+│   │   ├── procurement_remediations.py # What to do, per check, per side
+│   │   ├── procurement_service.py # Single entry point for an award review
 │   │   ├── clause_checklists.py # Per-contract-type missing-protection checklists
 │   │   ├── pattern_utils.py     # Line-wrap-tolerant pattern compilation
 │   │   ├── clause_triage.py     # HOT/WARM/COLD tiering that bounds LLM cost
@@ -107,11 +117,17 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │   │   └── logger.py            # Colorized Pipeline Stage Logging Engine
 │   └── schemas/
 │       ├── contract.py          # Contract review schemas: clauses, findings, party sides
+│       ├── procurement.py       # Event, policy rules, Evidence union, findings
+│       ├── procurement_review.py # Award review response envelope
 │       ├── contract_review.py   # Model-facing payloads & the review response envelope
 │       ├── legal.py             # Pydantic Schemas for Requests, Offenses, Actions & Duties
 │       └── corpus.py            # Legal Section Data Schemas
 ├── scripts/
 │   ├── ingest_legal_corpus.py   # Seed Data Ingestion Script (Batch & Async Setup)
+│   ├── evaluate_procurement_review.py  # Precision/recall over labelled events
+│   ├── calibrate_procurement_confidence.py # Reliability under degradation
+│   ├── generate_sample_events.py       # Demo sourcing events
+│   ├── generate_procurement_fixtures.py # The labelled evaluation set
 │   ├── fetch_indiacode_act.py   # Fetches an Act's sections verbatim from India Code
 │   ├── find_indiacode_act.py    # Looks up an Act's India Code act_id by name
 │   ├── test_pipeline.py         # End-to-End Pipeline Integration Test
@@ -271,10 +287,225 @@ which the measurement puts within 0.05 of observed quality.
 
 ### Frontend
 
-Streamlit multipage. `frontend/app.py` is the entrypoint; the two workbenches are
+Streamlit multipage. `frontend/app.py` is the entrypoint; the workbenches are in
 `frontend/pages/`. The contract page shows red flags, a clause-by-clause read, the
 missing protections, consistency conflicts, the document with every finding highlighted
 in place, and the full confidence basis.
+
+---
+
+## 🧾 Procurement Compliance
+
+A third LangGraph pipeline checks a **sourcing event** — the bid tab, the approvals
+and the award — against the buying organisation's own procurement policy and against
+Indian statute, before the purchase order is released. It shares the corpus and
+retrieval of the other two and answers a third question, so it is a third graph
+rather than extra nodes on either.
+
+```
+normalize event + evaluate checks + bid integrity + PO sub-review  (all deterministic,
+                                                                    outside the graph)
+  -> event_profiler -> statute_retriever -> narrator
+  -> narrative_verifier --(a number not in the review)--> narrator
+  -> procurement_compiler
+```
+
+- **The compliance determination is entirely deterministic.** Evaluation runs *before*
+  `ainvoke`, which is the opposite of where the contract pipeline puts its rules, and
+  for a reason: there, relabelling a clause legitimately changes which rules apply, so
+  the model's output is an input to the rules. Here the event is typed, structured data
+  and nothing a model does can change what a check reads. Running the engine first means
+  the retry loop can never move a value out from under recorded evidence, a total LLM
+  outage still yields the complete finding set, and `evaluate_procurement` stays a pure
+  function the harness can score without standing Qdrant or Groq up.
+- **The model does not propose findings here, and that is not timidity.** A contract is
+  arbitrary prose, so a model can genuinely notice something no rule encodes — hence
+  `red_flag_analyst`. A sourcing event is structured data with a fixed schema, and every
+  field is already visible to every check. There is no unread text to find something in,
+  so a model "finding" would not be a reading of the data; it would be an invented rule,
+  arrived at once, unreproducibly, next to findings that carry statutory citations. What
+  the model does is write the review up. Every number it writes is checked against the
+  material it was shown, and one that is not there sends the narrative back to be
+  rewritten — a wrong figure about somebody's money reads exactly like a right one.
+- **A missing collection is not an empty one.** `approvals: []` would be the worst bug
+  this feature could ship: a payload that simply omits its approvals array reads exactly
+  like an award nobody approved, and the difference is "we could not check" versus
+  "nobody signed it". `ProcurementEvent.provided_collections` is the caller's explicit
+  statement of what it supplied, an `AbsenceEvidence` outside that set can support only
+  `UNDETERMINED`, and the API refuses a payload that does not declare it.
+- **Nothing here certifies compliance.** There is no `COMPLIANT` status and no compliance
+  percentage. `OverallStatus` tops out at `NO_BREACH_FOUND`, and any material check that
+  could not be performed makes it `NO_BREACH_FOUND_WITH_GAPS`. Breaches, indicators and
+  gaps are three separate lists in the response and three separate tabs in the UI,
+  because a reader scanning one list will read a gap as a pass.
+- **A bid pattern is never a finding of collusion.** Section 3(3)(d) presumes an adverse
+  effect once bid rigging is *established*, and what s.3(3) attaches to is an agreement
+  between bidders — which a bid tab cannot establish. So every integrity signal is
+  `INDICATOR`, never `BREACH`; severity is capped below CRITICAL; titles are prefixed
+  "Indicator:"; corroboration is listed on one finding rather than raising severity; and
+  no LLM touches the wording, because a model asked to explain a bid pattern writes that
+  the vendors colluded. All of it is asserted in `tests/test_bid_integrity.py`.
+- **A finding is only meaningful relative to a side**, as in contract review. A
+  supplier-side review runs every statutory check and the purchase order's own terms,
+  and reports the buyer's internal controls as `NOT_APPLICABLE` — a delegation of
+  authority is not an obligation the supplier owes anyone. The same MSMED finding then
+  produces opposite instructions: the buyer is told to cut the term to 45 days before
+  release; the supplier is told the term is void to that extent and interest accrues
+  whatever they signed.
+
+### Grounding structured data
+
+Contract review grounds a finding with a verbatim quote and offsets, and `verify_quotes`
+re-derives the span. Most procurement findings are about structured facts instead —
+"policy requires three quotes, the event carries two" — where there is no span to quote.
+`Evidence` generalises grounding to four kinds, and `verify_evidence` holds all four to
+the same standard rather than a softer one:
+
+| kind | how it is re-derived |
+|---|---|
+| `DOCUMENT_SPAN` | the same whitespace-normalised string comparison `verify_quotes` uses |
+| `FIELD` | the path is re-resolved against the event and the stated comparison re-run |
+| `ABSENCE` | checked against `provided_collections`; outside it, supports only UNDETERMINED |
+| `DERIVED` | the registered computation is **re-executed** and must give the same Decimal |
+
+A path that resolves to *two* elements is an `AMBIGUOUS` failure, not a first-match —
+the direct analogue of a quote appearing twice with no way to tell which was meant. Every
+`field_path` comes from a check's declared `reads` tuple, which is code, so no model ever
+writes one. Anything that fails re-derivation is dropped by the compiler and named in
+`dropped_findings`, and confidence is computed on the pre-drop list so the drop still
+costs score.
+
+Every figure is `Decimal`, never float: verification is equality-based, float arithmetic
+does not reliably give the same answer twice, and a flaky verifier is a disabled one.
+
+### Policy: the model drafts, a person ratifies
+
+A procurement manual is prose; the checks need parameters. This is the only place a model
+comes near a rule, and it does not break "rules first, model second" because the
+predicates are a closed registry of 14 hand-written, regression-tested functions. The
+model chooses a `PolicyCheckKind` and fills typed parameter slots; it cannot write a
+comparison. A `MODEL_DRAFT` rule with no grounding quote cannot even be constructed — the
+validator rejects it.
+
+`DRAFT → RATIFIED | EDITED | REJECTED`, and only ratified or edited rules in an
+**activated** set are ever enforced. Editing a rule transfers it to the person: `origin`
+becomes `HUMAN` and the grounding quote is cleared, because it evidenced what the model
+read and that is no longer what the rule says. An activated version is immutable, so a
+review from six months ago stays re-derivable against the rules that actually produced
+it. Running against unratified rules is opt-in, marks every finding `provisional`,
+excludes them from every count, and caps confidence at **0.45**.
+
+### Checks
+
+| family | count | examples |
+|---|---|---|
+| Statute | 6 | MSMED s.15 payment ceiling, s.16 interest exposure, Companies Act s.188 / s.177 related-party approval, DPDP s.8 processor agreement |
+| Policy | 14 | quote counts by value, delegation of authority, approval before commitment, structuring across a threshold, scope drift, late bids, budget |
+| Bid integrity | 7 | near-identical totals, constant spread, identical unit prices, shared PAN root across GSTINs, cover bidding, rotating winners |
+
+MSMED s.15 is **not** a flat 45 days, and reading it that way would clear terms that are
+already outside the section. Where the period is agreed in writing the proviso caps it at
+45 days; where there is no written agreement the appointed day is **15**. So a 30-day term
+is compliant with a written agreement, a breach without one, and `UNDETERMINED` when
+nobody has said which — a fact that is itself often absent. Chapter V protects micro and
+small enterprises only (s.2(n)), so a medium enterprise is `NOT_APPLICABLE`, not a breach.
+And s.16's quantum is three times the *RBI bank rate* compounded monthly over a changing
+rate, so the system reports that interest is running and returns `UNDETERMINED` for the
+amount rather than quoting a rate hardcoded at build time.
+
+### API
+
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/api/v1/awards` | Review an event, optionally with the purchase order |
+| `GET` | `/api/v1/awards/{id}` | Fetch a stored review |
+| `DELETE` | `/api/v1/awards/{id}` | Delete the review and its event snapshot |
+| `GET` | `/api/v1/awards/{id}/actions` | What to do, worst first |
+| `GET` | `/api/v1/awards/{id}/report.pdf` | The review as an audit memo |
+| `POST` | `/api/v1/policies` | Create a rule set |
+| `PATCH` | `/api/v1/policies/{id}/rules/{rule_id}` | Ratify, edit or reject one rule |
+| `POST` | `/api/v1/policies/{id}/activate` | Freeze a version and put it in force |
+| `GET` | `/api/v1/procurement/meta/checks` | The full check catalogue |
+
+The catalogue is published rather than kept internal: it is what makes a ratification UI
+buildable, and it is the honest public statement of the system's reach — a reader can see
+what is *not* on it and know it was not checked.
+
+There is no async queue here, deliberately. A contract review is roughly thirty LLM calls,
+which is what earns `contract_worker` its place; a procurement review is one, because the
+compliance work is deterministic. A queue would be the decorative kind the scenario
+endpoint already has.
+
+`DELETE` genuinely removes the row. A bid tab carries vendor pricing, PAN and bank
+details — commercially sensitive in the same way a contract carries salaries.
+
+### Evaluation
+
+`scripts/evaluate_procurement_review.py` scores the deterministic spine against sixteen
+hand-labelled events in `tests/fixtures/procurement_eval/` — thirteen with known findings
+and three deliberately clean, so false positives are measured rather than assumed. The
+match key is `(check_id, subject_ref, status)`: the right check on the wrong vendor is a
+normalisation bug wearing a correct answer's clothes, and reporting `BREACH` where the key
+says `UNDETERMINED` is not a near miss — it is the specific failure this feature exists to
+prevent, so it counts as both a false positive and a false negative.
+
+```
+precision 1.000  recall 1.000  f1 1.000   (32 TP / 0 FP / 0 FN over 16 events)
+findings on clean events: 0   evidence verification failures: 0
+UNDETERMINED sold as PASS: 0   as BREACH: 0   INDICATOR sold as BREACH: 0
+```
+
+The clean fixtures earned their place on the first run: `CONSTANT_SPREAD` fired on an
+ordinary 790k/845k/902k three-bid spread. With three bids there are only two gaps to
+compare, and two numbers always look consistent — a signal that fires on what a
+competitive market routinely produces is measuring having too little data, not collusion.
+It now requires four bids. `tests/test_procurement_evaluation.py` holds the floors,
+including three zero-tolerance counters and a guard that every check in the registry has a
+labelled event, so a new check cannot ship unexercised.
+
+### Does the confidence score mean anything
+
+The same question the contract estimator answers, measured the same way: each labelled
+event is reviewed under eight deliberate degradations, and the score must move the right
+way by the right amount.
+
+| condition | predicted | observed | |
+|---|---|---|---|
+| everything supplied | 0.817 | 1.000 | |
+| cross-encoder unavailable | 0.706 | 1.000 | capped |
+| no model reached at all | 0.600 | 1.000 | capped |
+| vendor MSME status unknown | 0.675 | 0.812 | capped |
+| caller did not declare what it supplied | 0.650 | 0.802 | capped |
+| no procurement policy at all | 0.684 | 0.667 | capped |
+| evidence that will not re-derive | 0.500 | 1.000 | capped |
+| enforcing unratified rules | 0.450 | 1.000 | capped |
+
+This harness also found a real miscalibration, and the shape is familiar. A statute-only
+review scored **0.889** against a full review's 0.817 — *higher* — because dropping
+`policy_authority` renormalised the weights over four components that were all near 1.0.
+The estimator was rewarding a review for never having looked at the customer's policy.
+`STATUTE_ONLY_CAP = 0.70` came out of that measurement and sits within 0.02 of observed
+quality. It is the same failure `PARAGRAPH_FALLBACK_CAP` fixed in contract review: a
+weighted mean can express a component's *value*, never its absence.
+
+One cap crosses a pipeline boundary. Where any finding rests on the purchase order
+document, the procurement score cannot exceed the confidence of the contract sub-review
+that read it — a purchase order is usually an unnumbered form, so that sub-review
+routinely lands on `PARAGRAPH_FALLBACK_CAP`, and burying it inside a nested payload would
+let a 0.91 headline sit on top of a 0.70 document read.
+
+### Frontend
+
+Two more Streamlit pages. `📐 Policy Library` drafts, ratifies and activates rule sets and
+publishes the check catalogue. `🧾 Award Review` takes a sample event, pasted JSON or an
+uploaded purchase order, and shows Breaches, Bid Integrity, Could Not Be Checked, What To
+Do, Every Check, Confidence and Raw JSON as separate tabs.
+
+```bash
+uv run python scripts/generate_sample_events.py      # six demo events
+uv run python -m scripts.evaluate_procurement_review --verbose
+uv run python -m scripts.calibrate_procurement_confidence --verbose
+```
 
 ---
 
@@ -311,7 +542,7 @@ docker-compose up -d
 
 ### Legal corpus
 
-2,336 sections indexed from twelve statutes, in three retrieval pools:
+2,894 sections indexed from fifteen statutes, in four retrieval pools:
 
 | Statute | Sections | Pool |
 |---|---|---|
@@ -319,14 +550,30 @@ docker-compose up -d
 | Information Technology Act, 2000 | 109 | offence |
 | Sexual Harassment of Women at Workplace Act, 2013 (POSH) | 30 | offence |
 | Bharatiya Nagarik Suraksha Sanhita, 2023 (BNSS) | 533 | procedural |
-| Constitution of India | 519 | procedural |
+| Constitution of India | 484 | procedural |
 | Bharatiya Sakshya Adhiniyam, 2023 (BSA) | 170 | procedural |
 | Indian Contract Act, 1872 | 192 | contract |
 | Transfer of Property Act, 1882 | 135 | contract |
 | Consumer Protection Act, 2019 | 107 | contract |
-| Arbitration and Conciliation Act, 1996 | 93 | contract |
+| Arbitration and Conciliation Act, 1996 | 92 | contract |
 | Specific Relief Act, 1963 | 46 | contract |
-| Digital Personal Data Protection Act, 2023 | 44 | contract |
+| Digital Personal Data Protection Act, 2023 | 44 | contract, procurement |
+| Companies Act, 2013 | 483 | procurement |
+| Competition Act, 2002 | 79 | procurement |
+| Micro, Small and Medium Enterprises Development Act, 2006 | 32 | procurement |
+
+Counts are what the collection actually holds after `is_dead_law` filtering, not what the
+source files contain -- the table previously summed to 2,336 against 2,300 indexed.
+
+The **procurement** pool adds the three Acts an award actually turns on, none of which
+was reachable by either earlier pipeline. It also draws on the Contract Act and the DPDP
+Act, which sit in the contract pool too -- a pool is a retrieval filter, not an ownership
+claim, so an Act may belong to more than one. Measured against this corpus the pool
+returns the governing provision at rank 1 for each of the questions it exists to answer:
+MSMED s.15 for a delayed-payment query, s.16 for interest, Competition Act s.3 for bid
+rigging, Companies Act s.188 for a related-party award -- and the Companies Act's 483
+sections do not crowd out the 32 of the MSMED Act, because the act filter is applied
+inside both prefetches.
 
 The **contract** pool serves contract review and is never visible to either criminal
 pass. Mixing it into the offence pool would be harmful in both directions: a lease

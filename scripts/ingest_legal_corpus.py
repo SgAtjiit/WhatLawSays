@@ -22,11 +22,18 @@ async def main():
         "consumer_protection_act.json",
         "dpdp_act.json",
         "transfer_of_property_act.json",
+        # Procurement pool (see PROCUREMENT_ACTS). MSMED Chapter V, the
+        # Competition Act's anti-competitive agreements and the Companies
+        # Act's related-party provisions are what an award turns on, and
+        # none of them was reachable by either earlier pipeline.
+        "msmed_act.json",
+        "competition_act.json",
+        "companies_act.json",
     ]
 
     all_documents = []
 
-    print("[+] Loading Full Legal Corpus Datasets (Constitution, BSA, BNS, BNSS, IT Act, POSH Act + civil/contract pool)...")
+    print("[+] Loading Full Legal Corpus Datasets (criminal, civil/contract and procurement pools)...")
     start_time = time.time()
 
     for fname in corpus_files:
