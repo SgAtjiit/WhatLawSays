@@ -154,6 +154,19 @@ with st.sidebar:
         index=0 if online else 1,
         key="execution_mode",
     )
+    try:
+        from src.core import ocr as _ocr
+
+        if _ocr.is_available():
+            st.caption("🔍 OCR available — scans and photographs can be reviewed.")
+        else:
+            st.caption(
+                "🔍 OCR not installed — documents with no text layer will be "
+                "refused. Install it with `brew install tesseract`."
+            )
+    except Exception:
+        pass
+
     st.divider()
     st.subheader("📚 Contract Corpus")
     st.markdown(
@@ -179,9 +192,12 @@ if "contract_review" not in st.session_state:
     st.session_state["contract_text"] = ""
 
 uploaded = st.file_uploader(
-    "Upload your contract", type=["pdf", "docx", "txt", "md"],
-    help="PDF, Word or plain text. A scanned PDF with no text layer is refused "
-         "rather than reviewed, because an empty review reads as a clean contract.",
+    "Upload your contract",
+    type=["pdf", "docx", "txt", "md", "png", "jpg", "jpeg", "tiff", "tif", "bmp", "webp"],
+    help="PDF, Word, plain text, or a scan or photograph. A document with no text "
+         "layer is read by OCR and clearly labelled -- every finding then shows the "
+         "region of the scan it came from, because a quote checked against a "
+         "transcription only proves the transcription is self-consistent.",
 )
 # Deliberately not inside st.form: a form defers every rerun until submit, so
 # the side selector never followed the contract type and quietly submitted the
@@ -283,7 +299,15 @@ if review:
     with tabs[5]:
         render_consistency(review)
     with tabs[6]:
-        render_document_view(review, st.session_state.get("contract_text", ""))
+        if review.get("source") == "ocr":
+            st.info(
+                "This document was read from an image, so there is no source text "
+                "to highlight. Each finding on the Red Flags tab carries a crop of "
+                "the page it was read from instead.",
+                icon="🔍",
+            )
+        else:
+            render_document_view(review, st.session_state.get("contract_text", ""))
     with tabs[7]:
         render_confidence_basis(review)
     with tabs[8]:

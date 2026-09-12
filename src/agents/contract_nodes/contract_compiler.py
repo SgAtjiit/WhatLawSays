@@ -69,6 +69,8 @@ async def run_contract_compiler(state: ContractGraphState) -> ContractGraphState
         llm_available=state.get("llm_available", True),
         reranker_available=state.get("reranker_available", True),
         degraded_nodes=state.get("degraded_nodes", []),
+        source=document.source if document else "text_layer",
+        ocr_confidence=document.ocr_confidence if document else None,
     )
 
     clause_reviews = []

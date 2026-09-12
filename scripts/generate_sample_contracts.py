@@ -13,7 +13,6 @@ and reviewable, in the same spirit as the PDF fixture built inside the test suit
 """
 
 import io
-import os
 import pathlib
 
 OUT = pathlib.Path("samples")
@@ -527,6 +526,37 @@ def write_docx(name: str, paragraphs, table_rows=None) -> pathlib.Path:
     return path
 
 
+def write_scan_of(name: str, source: pathlib.Path, dpi: int = 200,
+                  rotate: float = 0.4, noise: int = 10) -> pathlib.Path:
+    """Turn a text-layer PDF into a genuine image-only one.
+
+    Rendered to images and written back with no text layer, then degraded the
+    way a real scan is: a fraction of a degree of skew from a page fed slightly
+    crooked, sensor noise, and a resolution below the 300 DPI OCR prefers. A
+    pristine render would flatter the OCR path and prove nothing.
+    """
+    import numpy as np
+    import pypdfium2 as pdfium
+    from PIL import Image
+
+    document = pdfium.PdfDocument(str(source))
+    pages = []
+    for index in range(len(document)):
+        image = document[index].render(scale=dpi / 72).to_pil().convert("L")
+        if rotate:
+            image = image.rotate(rotate, resample=Image.BICUBIC, fillcolor=255, expand=False)
+        if noise:
+            array = np.asarray(image).astype(np.int16)
+            rng = np.random.default_rng(index)
+            array = np.clip(array + rng.integers(-noise, noise + 1, array.shape), 0, 255)
+            image = Image.fromarray(array.astype(np.uint8))
+        pages.append(image.convert("RGB"))
+
+    path = OUT / name
+    pages[0].save(str(path), format="PDF", save_all=True, append_images=pages[1:])
+    return path
+
+
 def write_scanned_pdf(name: str, pages: int = 3) -> pathlib.Path:
     """A PDF with no text layer, as a phone photo or a flatbed scan produces.
 
@@ -542,6 +572,26 @@ def write_scanned_pdf(name: str, pages: int = 3) -> pathlib.Path:
     buffer = io.BytesIO()
     writer.write(buffer)
     path.write_bytes(buffer.getvalue())
+    return path
+
+
+def write_image_of(name: str, source: pathlib.Path, dpi: int = 170) -> pathlib.Path:
+    """A photograph of the first page, as someone would send from a phone."""
+    import numpy as np
+    import pypdfium2 as pdfium
+    from PIL import Image, ImageEnhance
+
+    document = pdfium.PdfDocument(str(source))
+    image = document[0].render(scale=dpi / 72).to_pil().convert("L")
+    image = image.rotate(-0.8, resample=Image.BICUBIC, fillcolor=255, expand=False)
+    # Uneven lighting, as a hand-held photo has.
+    array = np.asarray(image).astype(np.float32)
+    gradient = np.linspace(0.82, 1.06, array.shape[1])[None, :]
+    array = np.clip(array * gradient, 0, 255)
+    image = ImageEnhance.Contrast(Image.fromarray(array.astype(np.uint8))).enhance(0.92)
+
+    path = OUT / name
+    image.convert("RGB").save(str(path), format="PNG")
     return path
 
 
@@ -562,6 +612,10 @@ SAMPLES = [
      "30 clauses: exercises the HOT/WARM/COLD caps, a missing Schedule A and a broken cross-reference."),
     ("08_loan_agreement.docx", "LOAN", "BORROWER",
      "Unilateral interest variation, ouster of remedy, waiver of statutory rights."),
+    ("09_scanned_employment.pdf", "EMPLOYMENT", "EMPLOYEE",
+     "Contract 01 with no text layer: skewed, noisy, 200 DPI. Read by OCR."),
+    ("10_photo_of_contract.png", "EMPLOYMENT", "EMPLOYEE",
+     "A phone photograph of page 1: skewed, unevenly lit. Read by OCR."),
 ]
 
 
@@ -576,6 +630,9 @@ def main():
     write_scanned_pdf("06_scanned_no_text_layer.pdf")
     write_pdf("07_master_services_long.pdf", _msa(), "Master Services Agreement")
     write_docx("08_loan_agreement.docx", LOAN_PARAGRAPHS)
+    # A real scan: the same contract as 01, with no text layer at all.
+    write_scan_of("09_scanned_employment.pdf", OUT / "01_employment_loaded.pdf")
+    write_image_of("10_photo_of_contract.png", OUT / "01_employment_loaded.pdf")
 
     print(f"[+] Wrote {len(SAMPLES)} sample contracts to {OUT}/\n")
     for name, contract_type, position, note in SAMPLES:

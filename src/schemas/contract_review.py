@@ -231,6 +231,18 @@ class ContractReviewResponse(BaseModel):
         default=[], description="What to ask for on each flagged term, worst first"
     )
 
+    source: str = Field(
+        default="text_layer",
+        description=(
+            "'text_layer' when the words were lifted from the file, 'ocr' when "
+            "they are our reading of an image. Findings from an OCR review carry "
+            "a crop of the scan, because a quote checked against a transcription "
+            "proves only that the transcription is self-consistent."
+        ),
+    )
+    ocr_confidence: Optional[float] = None
+    ocr_basis: Optional[Dict[str, Any]] = None
+
     extraction_warnings: List[str] = Field(default=[])
     degraded_nodes: List[str] = Field(
         default=[], description="Stages that fell back to their rule-based engine"

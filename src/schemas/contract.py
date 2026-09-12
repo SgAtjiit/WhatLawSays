@@ -14,7 +14,7 @@ pipeline applies to section citations.
 """
 
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -186,6 +186,21 @@ class RedFlagFinding(BaseModel):
         default="rule",
         description="Provenance: 'rule' for a deterministic match, 'llm' for a model-proposed finding",
     )
+    read_confidence: Optional[float] = Field(
+        None,
+        description=(
+            "Lowest OCR confidence across the quoted words, when the document was "
+            "read from an image. None for text lifted from the file."
+        ),
+    )
+    evidence_image: Optional[str] = Field(
+        None,
+        description=(
+            "PNG data URI of the region of the scan this quote was read from. "
+            "Textual grounding is circular once the text is a transcription, so "
+            "the reader is shown the paper instead of being asked to trust it."
+        ),
+    )
 
 
 class MissingClauseFinding(BaseModel):
@@ -208,6 +223,28 @@ class ParsedDocument(BaseModel):
     filename: str
     media_type: str
     text: str = Field(..., description="Normalized full text; all offsets index into this")
+    source: str = Field(
+        default="text_layer",
+        description=(
+            "How the text was obtained: 'text_layer' lifts it verbatim from the "
+            "file, 'ocr' is our reading of an image. The distinction matters: a "
+            "quote can verify against an OCR transcription that misread the paper."
+        ),
+    )
+    ocr_confidence: Optional[float] = Field(
+        None, description="Mean per-word OCR confidence, 0-100, when source is 'ocr'"
+    )
+    ocr_basis: Optional[Dict[str, Any]] = Field(
+        None, description="Per-page confidences, word counts and unreadable pages"
+    )
+    ocr_words: List[Dict[str, Any]] = Field(
+        default=[],
+        description=(
+            "Compact per-word map: character span, page and pixel box. This is "
+            "what lets a finding be shown against the region of the scan it was "
+            "read from, rather than only as text we transcribed."
+        ),
+    )
     page_count: Optional[int] = None
     page_offsets: List[int] = Field(
         default=[],

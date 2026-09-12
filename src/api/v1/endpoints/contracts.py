@@ -94,7 +94,13 @@ def _check_side_belongs_to_type(contract_type, position, raw_position):
 @router.post("/contracts", response_model=ContractReviewResponse, tags=["Contract Review"])
 async def upload_and_review_contract(
     request: Request,
-    file: UploadFile = File(..., description="The contract: PDF, DOCX or TXT"),
+    file: UploadFile = File(
+        ...,
+        description=(
+            "The contract: PDF, DOCX, TXT, or a scan/photograph (PNG, JPEG, TIFF). "
+            "A document with no text layer is read by OCR and labelled as such."
+        ),
+    ),
     contract_type: Optional[str] = Form(
         None, description="EMPLOYMENT, NDA, LEASE, SERVICE, FREELANCE, LOAN, VENDOR, SAAS"
     ),
@@ -349,11 +355,15 @@ async def download_report(contract_id: str):
 
 @router.get("/contracts/meta/supported", tags=["Contract Review"])
 async def supported_options():
+    from src.core import ocr
     from src.schemas.contract import POSITIONS_BY_TYPE
 
     return {
         "media_types": sorted(SUPPORTED_MEDIA_TYPES),
         "max_file_bytes": MAX_FILE_BYTES,
+        # Without the tesseract binary a scan is refused rather than read, so a
+        # client can tell the user which it will be before they upload.
+        "ocr_available": ocr.is_available(),
         "contract_types": [t.value for t in ContractType],
         "positions_by_type": {
             t.value: [p.value for p in pair] for t, pair in POSITIONS_BY_TYPE.items()

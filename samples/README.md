@@ -30,6 +30,8 @@ clause and some additional model findings.
 | 06 | `06_scanned_no_text_layer.pdf` | — | **Refused with 422**, "most likely a scan or an image". It must not come back as a clean review. |
 | 07 | `07_master_services_long.pdf` | SAAS / CLIENT | **HIGH**, 8 findings over **30 clauses** — exercises the HOT/WARM/COLD triage caps. All three consistency checks fire: a notice conflict, a reference to clause 47 that doesn't exist, and a Schedule A that was never attached. |
 | 08 | `08_loan_agreement.docx` | LOAN / BORROWER | **CRITICAL**, 5 findings: unilateral interest variation, ouster of remedy, waiver of statutory rights, unilateral arbitrator, daily penalty. |
+| 09 | `09_scanned_employment.pdf` | EMPLOYMENT / EMPLOYEE | Contract 01 with **no text layer** — skewed, noisy, 200 DPI. Read by OCR, and finds the **same six red flags**. Confidence capped, banner shown, every finding carries a crop of the page. |
+| 10 | `10_photo_of_contract.png` | EMPLOYMENT / EMPLOYEE | A phone photograph of page 1: skewed, unevenly lit. Finds 5 of the 6 — the sixth is on page 2. |
 
 ## Driving them
 
@@ -65,6 +67,9 @@ curl -X DELETE http://localhost:8000/api/v1/contracts/$CID
   under Contract Act s.27 whoever it favours.
 - **Omit the `position` field.** Confidence is capped at 0.65 and the review asks
   you which side you are on, rather than guessing.
+- **Upload 09 and 01 back to back.** Same contract, one as text and one as a scan.
+  Identical findings; the scan carries a visible OCR banner, a lower confidence
+  ceiling, and an image of the page behind every finding.
 - **Ask 07 "what happens if I want to cancel".** The answer cites the clauses it
   used; ask it something the contract is silent on and it says so instead of
   inventing an answer.

@@ -13,7 +13,7 @@ which would otherwise render as a clean review of a contract nobody read.
 
 import io
 import re
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from src.schemas.contract import ParsedDocument
 
@@ -32,6 +32,13 @@ SUPPORTED_MEDIA_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
     "text/plain": "txt",
     "text/markdown": "txt",
+    # A scan or a photograph of a contract. Read by OCR, and the result is
+    # labelled as such all the way through to the response.
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/tiff": "image",
+    "image/bmp": "image",
+    "image/webp": "image",
 }
 
 _EXTENSION_MEDIA_TYPES = {
@@ -39,6 +46,13 @@ _EXTENSION_MEDIA_TYPES = {
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ".txt": "text/plain",
     ".md": "text/markdown",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
+    ".bmp": "image/bmp",
+    ".webp": "image/webp",
 }
 
 # Characters PDF producers emit that carry no meaning and break naive matching.
@@ -342,6 +356,48 @@ def _decode_text(data: bytes):
     )
 
 
+def _ocr_document(data: bytes, filename: str, media_type: str, kind: str):
+    """Read an image or a text-layerless PDF, and say how well it went."""
+    from src.core import ocr
+
+    try:
+        result = ocr.ocr_image_bytes(data) if kind == "image" else ocr.ocr_pdf(data)
+    except ocr.OcrUnavailable:
+        raise
+    except Exception as exc:
+        # A corrupt or unreadable file must reach the caller as a refusal it can
+        # act on, not as whatever the renderer happened to raise.
+        raise DocumentParseError(
+            f"Could not read {filename!r} as an image: {exc}"
+        ) from exc
+    if not result.words:
+        raise DocumentParseError(
+            f"Nothing could be read from {filename!r}, even by OCR. If it is a "
+            "photograph, retake it square-on in good light at the highest "
+            "resolution available."
+        )
+
+    warnings = [
+        "This document has no text layer, so it was read by OCR. Every quoted "
+        f"passage is our reading of the image rather than text taken from the "
+        f"file, and characters can be misread -- particularly in amounts. Mean "
+        f"confidence {result.mean_confidence:.0f}%."
+    ]
+    if result.unreadable_pages:
+        shown = ", ".join(str(n) for n in result.unreadable_pages[:10])
+        warnings.append(
+            f"{len(result.unreadable_pages)} page(s) could not be read at all "
+            f"(page {shown}). Anything on them was not reviewed."
+        )
+    low = len(result.low_confidence_words)
+    if low:
+        warnings.append(
+            f"{low} of {len(result.words)} words were read with low confidence. "
+            "Check any figure or date a finding turns on against the original."
+        )
+    return result, warnings
+
+
 def parse_document(
     data: bytes, filename: str, declared_media_type: Optional[str] = None
 ) -> ParsedDocument:
@@ -358,9 +414,38 @@ def parse_document(
     kind = SUPPORTED_MEDIA_TYPES[media_type]
     warnings: List[str] = []
     page_count: Optional[int] = None
+    ocr_result = None
+    unreadable: List[int] = []
 
-    if kind == "pdf":
+    if kind == "image":
+        ocr_result, ocr_warnings = _ocr_document(data, filename, media_type, kind)
+        raw_pages = [ocr_result.text]
+        page_count = ocr_result.page_count
+        warnings.extend(ocr_warnings)
+    elif kind == "pdf":
         raw_pages, page_count, unreadable = _extract_pdf(data)
+        # Most of the document has no text layer: it is a scan. Read it by OCR
+        # where that is possible, and refuse only when it is not -- reviewing it
+        # as-is would report no problems simply because nothing could be read,
+        # which is indistinguishable from a clean contract.
+        if page_count and unreadable and len(unreadable) * 2 > page_count:
+            from src.core import ocr as _ocr
+
+            if _ocr.is_available():
+                ocr_result, ocr_warnings = _ocr_document(data, filename, media_type, kind)  # noqa: E501
+                raw_pages = [ocr_result.text]
+                page_count = ocr_result.page_count
+                warnings.extend(ocr_warnings)
+                unreadable = []
+            else:
+                raise DocumentParseError(
+                    f"{len(unreadable)} of this PDF's {page_count} pages have no "
+                    "readable text, so most of the contract could not be read. It "
+                    "is most likely a scan or an image, and OCR is not installed "
+                    "on this machine (macOS: `brew install tesseract`). Run OCR on "
+                    "it and upload the text version -- reviewing it as-is would "
+                    "report no problems simply because nothing could be read."
+                )
     elif kind == "docx":
         blocks, docx_warnings = _extract_docx(data)
         raw_pages = ["\n\n".join(blocks)]
@@ -384,14 +469,6 @@ def parse_document(
     if kind == "pdf" and page_count:
         # Averaged density hides a partial scan: 8 good pages among 20 pass it
         # comfortably while 12 pages of the contract were never read at all.
-        if unreadable and len(unreadable) * 2 > page_count:
-            raise DocumentParseError(
-                f"{len(unreadable)} of this PDF's {page_count} pages have no "
-                "readable text, so most of the contract could not be read. It is "
-                "most likely a scan or an image. Run OCR on it and upload the "
-                "text version -- reviewing it as-is would report no problems "
-                "simply because nothing could be read."
-            )
         if unreadable:
             shown = ", ".join(str(n) for n in unreadable[:10])
             warnings.append(
@@ -402,11 +479,13 @@ def parse_document(
             )
 
         density = len(text) / page_count
-        if density < MIN_CHARS_PER_PAGE:
+        if density < MIN_CHARS_PER_PAGE and ocr_result is None:
             raise DocumentParseError(
                 f"This PDF has almost no extractable text ({len(text)} characters "
-                f"across {page_count} pages). It is most likely a scan or an image. "
-                "Run OCR on it and upload the text version -- reviewing it as-is "
+                f"across {page_count} pages). It is most likely a scan or an image, "
+                "and OCR is not installed on this machine (macOS: `brew install "
+                "tesseract`). Run OCR on it and upload the text version -- "
+                "reviewing it as-is "
                 "would report no problems simply because nothing could be read."
             )
 
@@ -420,6 +499,10 @@ def parse_document(
         filename=filename,
         media_type=media_type,
         text=text,
+        source="ocr" if ocr_result is not None else "text_layer",
+        ocr_confidence=ocr_result.mean_confidence if ocr_result is not None else None,
+        ocr_basis=ocr_result.to_payload() if ocr_result is not None else None,
+        ocr_words=ocr_result.word_payload() if ocr_result is not None else [],
         page_count=page_count,
         page_offsets=page_offsets if page_count else [],
         char_count=len(text),

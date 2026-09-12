@@ -12,10 +12,10 @@ from unittest.mock import patch
 import docx
 import pytest
 from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls, qn
+from docx.oxml.ns import nsdecls
 
 from src.core.clause_segmenter import segment_clauses
-from src.core.document_parser import DocumentParseError, normalize, parse_document
+from src.core.document_parser import DocumentParseError, parse_document
 from src.core.red_flag_rules import evaluate_clauses, verify_quotes
 from src.schemas.contract import PartyPosition
 
@@ -315,13 +315,22 @@ def _pdf_reader(good_pages, blank_pages, body):
     return Reader
 
 
-def test_a_mostly_unreadable_pdf_is_refused():
+def test_a_mostly_unreadable_pdf_is_routed_to_ocr_or_refused():
     """Averaged density hid a partial scan: 8 readable pages among 20 pass it
-    comfortably while 12 pages of the contract were never read at all."""
+    comfortably while 12 pages of the contract were never read at all.
+
+    With OCR installed the document is now read from the image instead of being
+    refused; without it, the refusal stands. Either way it never passes silently
+    as a contract most of which nobody read."""
+
     body = open("tests/fixtures/employment_agreement.txt").read()
     with patch("pypdf.PdfReader", _pdf_reader(8, 12, body)):
-        with pytest.raises(DocumentParseError, match="scan or an image"):
+        with pytest.raises(DocumentParseError) as raised:
+            # The stub bytes are not a real PDF, so the OCR path cannot render
+            # them either -- both branches end in a refusal with a clear reason.
             parse_document(b"%PDF-1.4 stub", "p.pdf")
+    message = str(raised.value).lower()
+    assert "scan" in message or "could not" in message or "nothing could be read" in message
 
 
 def test_a_few_unreadable_pages_are_declared():

@@ -89,9 +89,10 @@ def test_unsupported_extension_is_refused():
         media_type_for("contract.pages")
 
 
-def test_a_scanned_pdf_is_refused_rather_than_reviewed():
-    """A PDF with no text layer segments into zero clauses, which would render
-    as a clean review of a contract nobody read."""
+def test_a_pdf_with_nothing_on_it_is_refused():
+    """A blank PDF segments into zero clauses, which would render as a clean
+    review of a contract nobody read. OCR is attempted and confirms there is
+    nothing there, so it is still refused -- just for a better-evidenced reason."""
     from pypdf import PdfWriter
 
     writer = PdfWriter()
@@ -100,7 +101,7 @@ def test_a_scanned_pdf_is_refused_rather_than_reviewed():
     buffer = io.BytesIO()
     writer.write(buffer)
 
-    with pytest.raises(DocumentParseError, match="scan or an image"):
+    with pytest.raises(DocumentParseError, match="[Nn]othing could be read|scan or an image"):
         parse_document(buffer.getvalue(), "scan.pdf")
 
 

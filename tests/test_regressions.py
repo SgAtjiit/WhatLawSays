@@ -7,7 +7,6 @@ existing test exercised.
 """
 
 import asyncio
-import pathlib
 from unittest.mock import patch
 
 import pytest
@@ -296,7 +295,9 @@ def test_the_fair_sample_contract_raises_nothing():
     assert evaluate_clauses(segment_clauses(document), PartyPosition.EMPLOYEE) == []
 
 
-def test_the_scanned_sample_is_refused():
+def test_the_blank_sample_is_still_refused():
+    """OCR removes the refusal for scans that carry text. A page with nothing on
+    it is not such a case, and must not start passing."""
     import pathlib as _pathlib
 
     from src.core.document_parser import DocumentParseError
@@ -304,5 +305,5 @@ def test_the_scanned_sample_is_refused():
     sample = _pathlib.Path("samples/06_scanned_no_text_layer.pdf")
     if not sample.exists():
         pytest.skip("run scripts/generate_sample_contracts.py first")
-    with pytest.raises(DocumentParseError, match="scan or an image"):
+    with pytest.raises(DocumentParseError, match="[Nn]othing could be read|scan or an image"):
         parse_document(sample.read_bytes(), sample.name)

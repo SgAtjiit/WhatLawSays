@@ -11,6 +11,7 @@ retry re-enters the analyst, and a node that re-cut clause boundaries would move
 text out from under offsets already recorded in first-pass findings.
 """
 
+import base64
 import uuid
 from typing import Any, Dict, Optional
 
@@ -61,6 +62,42 @@ def initial_state(document, clauses, contract_id, contract_type, position, juris
         "confidence_basis": None,
         "final_response": None,
     }
+
+
+def _attach_scan_evidence(review: Dict[str, Any], document, data: bytes) -> int:
+    """Show each finding against the region of the scan it was read from.
+
+    Once the text is a transcription, "this finding quotes the document" is a
+    claim about our own reading -- verifying it proves only that we are
+    consistent with ourselves. The reader is therefore given the paper: a crop
+    of the words the finding rests on, plus how confidently they were read.
+    """
+    from src.core import ocr
+
+    words = document.ocr_words or []
+    if not words:
+        return 0
+
+    attached = 0
+    for finding in review.get("findings", []):
+        located = ocr.locate_in_words(words, finding["match_start"], finding["match_end"])
+        if not located:
+            continue
+        finding["read_confidence"] = round(located["min_confidence"], 1)
+        # A crop spanning a page break would be two disjoint regions; the
+        # confidence still travels, but there is no single image to show.
+        if located["spans_pages"]:
+            continue
+        try:
+            image = ocr.render_crop(
+                data, document.media_type, located["page"],
+                (located["left"], located["top"], located["right"], located["bottom"]),
+            )
+        except Exception:
+            continue
+        finding["evidence_image"] = "data:image/jpeg;base64," + base64.b64encode(image).decode()
+        attached += 1
+    return attached
 
 
 async def review_contract(
@@ -141,6 +178,18 @@ async def review_contract(
         raise
 
     review["contract_id"] = contract_id
+    review["source"] = document.source
+    review["ocr_confidence"] = document.ocr_confidence
+    review["ocr_basis"] = document.ocr_basis
+
+    if document.source == "ocr":
+        attached = _attach_scan_evidence(review, document, data)
+        pipeline_logger.log_step(
+            STAGE,
+            f"Contract [{contract_id}] was read by OCR at "
+            f"{document.ocr_confidence:.0f}% -> attached {attached} evidence crop(s)",
+            status="SUCCESS",
+        )
 
     if persist:
         # Update-only: if the user deleted the contract while this ran, the

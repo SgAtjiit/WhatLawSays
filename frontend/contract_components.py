@@ -122,6 +122,21 @@ def render_risk_summary(review: dict):
             icon="⚠️",
         )
 
+    if review.get("source") == "ocr":
+        confidence = review.get("ocr_confidence")
+        basis = review.get("ocr_basis") or {}
+        low = basis.get("low_confidence_words", 0)
+        st.warning(
+            f"**Read by OCR — this document had no text layer.** Every quoted "
+            f"passage below is our reading of an image, not text taken from the "
+            f"file, so characters can be misread — most often a digit in an "
+            f"amount. Mean confidence "
+            f"{confidence:.0f}%{f', with {low} low-confidence words' if low else ''}. "
+            f"Each finding shows the region of the scan it came from: check it "
+            f"against your original before relying on it.",
+            icon="🔍",
+        )
+
     for warning in review.get("extraction_warnings", []):
         st.warning(warning, icon="📄")
     if review.get("degraded_nodes"):
@@ -164,6 +179,24 @@ def render_findings(review: dict):
             """,
             unsafe_allow_html=True,
         )
+        if finding.get("evidence_image"):
+            read = finding.get("read_confidence")
+            label = "What the scan actually says"
+            if read is not None and read < 75:
+                label += f"  —  read at only {read:.0f}% confidence"
+            with st.expander(label, expanded=read is not None and read < 75):
+                st.image(finding["evidence_image"])
+                st.caption(
+                    "The region of the page this finding was read from. If it does "
+                    "not match the quote above, the transcription is wrong and the "
+                    "finding should be disregarded."
+                )
+        elif finding.get("read_confidence") is not None:
+            st.caption(
+                f"Read from a scan at {finding['read_confidence']:.0f}% confidence; "
+                "this passage crosses a page break so no single image can show it."
+            )
+
         for citation in finding.get("citations", []):
             with st.expander(f"Why {citation['section_number']} applies", expanded=False):
                 st.markdown(f"**{citation['act']} — {citation['section_number']}**")

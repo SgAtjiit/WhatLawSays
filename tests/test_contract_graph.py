@@ -447,7 +447,8 @@ def test_the_basis_payload_explains_the_number(employment):
     ).to_payload()
     assert set(payload) == {"score", "components", "caps_applied", "notes", "detail"}
     assert set(payload["components"]) == {
-        "segmentation", "coverage", "grounding", "provenance", "profile"
+        "segmentation", "coverage", "grounding", "provenance", "profile",
+        "text_fidelity",
     }
 
 
