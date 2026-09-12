@@ -68,7 +68,11 @@ ABSENCE_RETRIEVAL_FLOOR = 0.45
 CONTRADICTION_EVIDENCE = 0.90
 WEAK_EXCLUSION_EVIDENCE = 0.25
 
-_SECTION_DIGITS = re.compile(r"\d+[A-Za-z]*")
+# A one-or-two letter suffix may be joined ("66B"), hyphenated ("66-B", "243-O")
+# or, at the end of the string, spaced ("66 B"). The old pattern stopped at the
+# hyphen, so s.66-B grounded against s.66's chunk with a perfect score while its
+# own chunk scored zero. Prose after the number ("66 read with") is not a suffix.
+_SECTION_DIGITS = re.compile(r"\d+(?:-?[A-Za-z]{1,2}(?![A-Za-z])|\s+[A-Za-z]{1,2}$)?")
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +160,24 @@ def act_family(act: str) -> str:
         return "it"
     if "sexual harassment" in a or "posh" in a:
         return "posh"
+    # Civil and contract-law Acts, for the same reason: without their own
+    # families all six collapse into "unknown", which would let Contract Act
+    # s.27 (restraint of trade, void) ground a citation against Transfer of
+    # Property Act s.27, or against any other s.27 in the pool.
+    if "indian contract act" in a or "(contract act" in a:
+        return "contract"
+    if "specific relief" in a or "(sra" in a:
+        return "specific_relief"
+    if "arbitration" in a:
+        return "arbitration"
+    # Tested before consumer protection: the DPDP Act's own short title also
+    # contains the words "Data Protection".
+    if "digital personal data" in a or "dpdp" in a:
+        return "dpdp"
+    if "consumer protection" in a or "(cpa" in a:
+        return "consumer"
+    if "transfer of property" in a or "(tpa" in a:
+        return "transfer_of_property"
     # BNSS must be tested before BNS: the substring "bns" also matches "bnss".
     if "nagarik" in a or "nagrik" in a or "bnss" in a or "crpc" in a or "criminal procedure" in a:
         return "bnss"
@@ -170,7 +192,8 @@ def act_family(act: str) -> str:
 
 def section_key(act: str, section: Any) -> Tuple[str, str]:
     match = _SECTION_DIGITS.search(str(section or ""))
-    return (act_family(act), match.group(0).lower() if match else "")
+    number = re.sub(r"[\s-]", "", match.group(0)).lower() if match else ""
+    return (act_family(act), number)
 
 
 def build_chunk_index(chunks: Sequence[Dict[str, Any]]) -> Dict[Tuple[str, str], float]:

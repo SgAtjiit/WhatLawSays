@@ -1,7 +1,10 @@
 from fastapi import APIRouter
-from src.api.v1.endpoints import analyze
+from src.api.v1.endpoints import contracts
 
 api_router = APIRouter()
 
-# Include the analyze endpoint we built earlier
-api_router.include_router(analyze.router, tags=["Legal Analysis"])
+# `analyze` is deliberately NOT included here. src/main.py defines
+# /api/v1/analyze itself, and mounting the endpoint module as well would serve
+# two implementations of the same route -- the divergence its own comment warns
+# about, where the two entry points scored the same scenario differently.
+api_router.include_router(contracts.router)

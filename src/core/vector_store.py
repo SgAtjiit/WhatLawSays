@@ -5,28 +5,25 @@ from qdrant_client import AsyncQdrantClient, models
 from src.config import settings
 from src.schemas.corpus import LegalSectionDoc
 
-# Canonical `act` payload values, exactly as indexed in the collection.
-ACT_BNS = "Bharatiya Nyaya Sanhita, 2023 (BNS)"
-ACT_BNSS = "Bharatiya Nagarik Suraksha Sanhita, 2023 (BNSS)"
-ACT_BSA = "Bharatiya Sakshya Adhiniyam, 2023 (BSA)"
-ACT_CONSTITUTION = "Constitution of India"
-
-# Only the BNS creates offences. Searching it alongside the other three left the
-# substantive penal law outnumbered roughly 3:1 in every candidate pool, so
-# procedural and constitutional provisions crowded out the sections an offence
-# analysis actually needs.
-ACT_IT = "The Information Technology Act, 2000 (IT Act)"
-ACT_POSH = (
-    "The Sexual Harassment of Women at Workplace "
-    "(Prevention, Prohibition and Redressal) Act, 2013 (POSH Act)"
+# Act names and retrieval pools live in `acts` so they can be imported without
+# loading the embedding models below. Re-exported here for existing callers.
+from src.core.acts import (  # noqa: F401
+    ACT_ARBITRATION,
+    ACT_BNS,
+    ACT_BNSS,
+    ACT_BSA,
+    ACT_CONSTITUTION,
+    ACT_CONSUMER,
+    ACT_CONTRACT,
+    ACT_DPDP,
+    ACT_IT,
+    ACT_POSH,
+    ACT_SPECIFIC_RELIEF,
+    ACT_TRANSFER_OF_PROPERTY,
+    CONTRACT_ACTS,
+    PROCEDURAL_ACTS,
+    SUBSTANTIVE_ACTS,
 )
-
-# The IT Act (ss. 65-74) and the POSH Act (s. 26) both create offences, so they
-# join the BNS in the offence-identification pass. Their procedural and
-# definitional sections are filtered out downstream by title, exactly as the
-# BNS's own preliminary provisions already are.
-SUBSTANTIVE_ACTS = [ACT_BNS, ACT_IT, ACT_POSH]
-PROCEDURAL_ACTS = [ACT_BNSS, ACT_BSA, ACT_CONSTITUTION]
 
 # Namespace for deterministic point ids (see _point_id).
 _POINT_NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")

@@ -1,0 +1,63 @@
+EMPLOYMENT AGREEMENT
+
+This Employment Agreement is made at Bengaluru on the 1st day of April 2025 between
+Northwind Technologies Private Limited, a company incorporated under the Companies
+Act, 2013, having its registered office at Koramangala, Bengaluru (hereinafter
+referred to as "the Company") and Mr. A. Sharma, residing at Indiranagar, Bengaluru
+(hereinafter referred to as "the Employee").
+
+1. APPOINTMENT AND TERM
+The Company appoints the Employee as Senior Software Engineer with effect from
+15 April 2025. This Agreement shall remain in force until terminated in accordance
+with the provisions set out herein.
+
+2. REMUNERATION
+The Employee shall be paid a gross salary of Rs. 18,00,000 per annum, payable
+monthly in arrears on or before the seventh day of the succeeding month, subject
+to deduction of tax at source and other statutory deductions.
+
+3. PROBATION
+The Employee shall be on probation for a period of six months from the date of
+joining. The Company may extend the probation period at its discretion.
+
+4. MINIMUM SERVICE PERIOD
+The Employee shall serve the Company for a minimum service period of three years
+from the date of joining. In the event the Employee resigns before completion of
+the said period, the Employee shall refund the training cost incurred by the
+Company amounting to Rs. 4,00,000 together with the recruitment expenses.
+
+5. TERMINATION
+The Company may terminate this Agreement at any time without assigning any reason
+by giving fifteen days notice in writing. The Employee may resign only after
+serving a notice period of ninety days, failing which the Employee shall be liable
+to pay salary in lieu of the shortfall.
+
+6. CONFIDENTIALITY
+The Employee shall not disclose any Confidential Information of the Company to any
+third party. The obligations of confidentiality under this clause shall survive
+the termination of this Agreement in perpetuity and shall remain binding on the
+Employee for all time.
+
+7. INTELLECTUAL PROPERTY
+The Employee hereby assigns to the Company all intellectual property, inventions,
+designs and works created by the Employee during the term of employment, whether
+or not such creation is related to the business of the Company and whether or not
+created during working hours or using Company resources.
+
+8. NON-COMPETITION
+The Employee shall not, for a period of twenty four months after the termination
+of employment with the Company, directly or indirectly engage in, be employed by,
+or render services to any competing business anywhere in India.
+
+9. NON-SOLICITATION
+The Employee shall not solicit any employee or customer of the Company for a period
+of twelve months following cessation of employment.
+
+10. DISPUTE RESOLUTION
+Any dispute arising out of or in connection with this Agreement shall be referred
+to arbitration before a sole arbitrator appointed by the Company, whose decision
+shall be final and binding. The seat of arbitration shall be Bengaluru.
+
+11. GOVERNING LAW
+This Agreement shall be governed by the laws of India and the courts at Bengaluru
+shall have exclusive jurisdiction.

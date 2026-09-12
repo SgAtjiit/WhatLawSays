@@ -28,7 +28,33 @@ PAGE_SIZE = 100
 # "[Omitted.]" while still printing the original text in the body. IT Act s.66A
 # (struck down in Shreya Singhal v. Union of India) is the clearest example.
 # These are not enforceable law and must not enter a legal-advice corpus.
-OMITTED_TITLE = re.compile(r"^\[?\s*omitted\s*\.?\s*\]?\s*\.?$", re.I)
+OMITTED_TITLE = re.compile(r"^\[?\s*(omitted|repealed)\s*\.?\s*\]?\s*\.*$", re.I)
+
+# A repealed section keeps its original title inside square brackets and replaces
+# the body with a repeal note. The Contract Act alone carries around forty of
+# them -- ss. 76-123 moved to the Sale of Goods Act 1930 and ss. 239-266 to the
+# Partnership Act 1932 -- so a title-only guard would admit dead law that the
+# analyst could then cite as though it were in force.
+# Three shapes seen in live harvests: "[Title] Rep. by s. 65", a footnote-
+# numbered "1 [Title] Rep. by ...", and "Repealed by" / "Omitted by" in full. The
+# eight repealed Contract Act sections that were caught before were caught only
+# because their titles happened to read "Repealed." -- this guard never fired.
+# Kept in sync with src/schemas/corpus.py:is_dead_law, which the ingest uses.
+REPEALED_BODY = re.compile(
+    r"^(?:\d+\s*)?(?:"
+    r"\[\s*(?:Omitted|Repealed)[^\]]*\]"
+    r"|(?:\[[^\]]*\]\s*)?(?:Rep\.?\s*by|Repealed(?:\s+by)?|Omitted(?:\s+by)?)\b"
+    r")",
+    re.I,
+)
+
+# Provisions India Code still renders with their full operative text although
+# they are no longer law. Arbitration Act s.87 was inserted by the 2019
+# amendment, struck down by the Supreme Court in Hindustan Construction (2019),
+# and omitted by Act 3 of 2021 -- and is served by India Code as though live.
+KNOWN_DEAD = {
+    ("The Arbitration and Conciliation Act, 1996", "87"),
+}
 
 # Punishment clauses are captured verbatim from the section text -- never
 # composed -- so the worst failure mode is a truncation, not an invention.
@@ -99,6 +125,14 @@ def to_corpus_docs(items, short_tag):
         content = clean(meta(item, "dc.identifier.section_page_note"))
         if not content:
             omitted.append(f"{number} (no text)")
+            continue
+
+        if REPEALED_BODY.match(content):
+            omitted.append(f"{number} (repealed)")
+            continue
+
+        if (meta(item, "dc.identifier.act_name"), number) in KNOWN_DEAD:
+            omitted.append(f"{number} (struck down / omitted, rendered live by source)")
             continue
 
         punishment_match = PUNISHMENT.search(content)

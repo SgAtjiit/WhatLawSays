@@ -3,7 +3,7 @@ import json
 import os
 import time
 from src.core.vector_store import vector_store
-from src.schemas.corpus import LegalSectionDoc
+from src.schemas.corpus import LegalSectionDoc, is_dead_law
 
 
 async def main():
@@ -15,11 +15,18 @@ async def main():
         "bnss.json",
         "it_act.json",
         "posh_act.json",
+        # Civil pool, used by contract review only (see CONTRACT_ACTS).
+        "contract_act.json",
+        "specific_relief_act.json",
+        "arbitration_act.json",
+        "consumer_protection_act.json",
+        "dpdp_act.json",
+        "transfer_of_property_act.json",
     ]
 
     all_documents = []
 
-    print("[+] Loading Full Legal Corpus Datasets (Constitution, BSA, BNS, BNSS, IT Act, POSH Act)...")
+    print("[+] Loading Full Legal Corpus Datasets (Constitution, BSA, BNS, BNSS, IT Act, POSH Act + civil/contract pool)...")
     start_time = time.time()
 
     for fname in corpus_files:
@@ -32,8 +39,13 @@ async def main():
             raw_data = json.load(f)
 
         docs = [LegalSectionDoc(**item) for item in raw_data]
-        all_documents.extend(docs)
-        print(f"  [+] Loaded {len(docs)} sections from [{fname}]", flush=True)
+        # Belt and braces over the data files: an omitted Article indexed as
+        # live law is returned at rank 1 for its own title.
+        live = [d for d in docs if not is_dead_law(d.act, d.section_number, d.title, d.content)]
+        if len(live) != len(docs):
+            print(f"  [!] Skipping {len(docs) - len(live)} repealed/omitted sections in [{fname}]", flush=True)
+        all_documents.extend(live)
+        print(f"  [+] Loaded {len(live)} sections from [{fname}]", flush=True)
 
     print(f"[+] Total Legal Sections Loaded: {len(all_documents)}", flush=True)
 

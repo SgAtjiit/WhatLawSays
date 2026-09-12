@@ -4,7 +4,6 @@
 env/
 venv/
 ENV/
-tests/
 qdrant_db/
 # Python
 __pycache__/
@@ -14,6 +13,9 @@ __pycache__/
 config.py
 # `uv` specific
 uv.lock
+
+# OS
+.DS_Store
 
 # IDEs
 .vscode/

@@ -11,6 +11,35 @@ _PENALTY_LANGUAGE = re.compile(
 )
 
 
+# A provision whose body is a repeal or omission note is not law. India Code
+# renders these with a live-looking title often enough that the constitution
+# corpus carried 36 omitted Articles, returned at rank 1 for their own titles.
+# Kept in sync with scripts/fetch_indiacode_act.py:REPEALED_BODY.
+_DEAD_LAW = re.compile(
+    r"^(?:\d+\s*)?(?:"
+    r"\[\s*(?:Omitted|Repealed)[^\]]*\]"            # the body is just "[Omitted.]"
+    r"|(?:\[[^\]]*\]\s*)?(?:Rep\.?\s*by|Repealed(?:\s+by)?|Omitted(?:\s+by)?)\b"
+    r")",
+    re.I,
+)
+_DEAD_TITLE = re.compile(r"(?:^|\W)(?:omitted|repealed)\.?\]?\.?\s*$", re.I)
+
+# (act name as indexed, bare section number) pairs the source renders as live
+# law although they are not. See scripts/fetch_indiacode_act.py:KNOWN_DEAD.
+KNOWN_DEAD_SECTIONS = {
+    ("The Arbitration and Conciliation Act, 1996 (Arbitration Act)", "Section 87"),
+}
+
+
+def is_dead_law(act: str, section_number: str, title: str, content: str) -> bool:
+    """True for a repealed, omitted or struck-down provision."""
+    if (act, section_number) in KNOWN_DEAD_SECTIONS:
+        return True
+    if _DEAD_LAW.match(content or ""):
+        return True
+    return bool(_DEAD_TITLE.search(title or ""))
+
+
 class LegalSectionDoc(BaseModel):
   act: str = Field(
       ..., description="e.g., Bharatiya Nyaya Sanhita, 2023 (BNS)"
