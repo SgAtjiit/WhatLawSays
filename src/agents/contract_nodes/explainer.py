@@ -100,7 +100,9 @@ async def run_clause_explainer(state: ContractGraphState) -> ContractGraphState:
                 continue
 
             async def worker(batch, _with=with_statute):
-                return await explain(batch, _with)
+                # The batch is returned alongside its result so the writer can
+                # restrict itself to the clauses this call actually saw.
+                return set(batch), await explain(batch, _with)
 
             outcome = await gather_batched(
                 indices, batch_size, worker, settings.CONTRACT_LLM_CONCURRENCY
@@ -109,9 +111,12 @@ async def run_clause_explainer(state: ContractGraphState) -> ContractGraphState:
             # Groq returns None when the model answers in prose instead of
             # calling the structured-output tool -- a real and frequent
             # outcome, and one that used to crash the whole node.
-            for result in [r for r in outcome.results if r is not None]:
+            for allowed, result in [r for r in outcome.results if r and r[1] is not None]:
                 for item in result.explanations or []:
-                    if item.clause_index in explanations:
+                    # Only clauses this batch was shown. A WARM batch was able to
+                    # overwrite a HOT clause's explanation with prose about a
+                    # clause it had never been given.
+                    if item.clause_index in allowed and item.clause_index in explanations:
                         explanations[item.clause_index] = {
                             "plain_english": item.plain_english,
                             "obligations": list(item.obligations or []),

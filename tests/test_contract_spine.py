@@ -56,8 +56,16 @@ def rental():
 # Document parsing
 # ---------------------------------------------------------------------------
 
-def test_normalize_rejoins_words_split_across_a_line_break():
-    assert normalize("termi-\nnation") == "termination"
+def test_normalize_joins_a_hyphenated_word_across_a_line_break_keeping_the_hyphen():
+    """The newline goes, the hyphen stays.
+
+    Dropping it produced "twentyfour months" and "interestfree deposit" in the
+    evidence quoted back to the reader, because contracts break exactly those
+    compounds at line ends. Leaving a genuine syllable break as "termi-nation"
+    needs the producer to hyphenate mid-word, which Word does not do by default.
+    """
+    assert normalize("twenty-\nfour months") == "twenty-four months"
+    assert normalize("interest-\nfree deposit") == "interest-free deposit"
 
 
 def test_normalize_keeps_genuine_hyphenated_compounds():
@@ -117,7 +125,19 @@ def test_page_for_offset_is_none_without_pagination(employment):
 
 def test_numbered_contract_segments_into_its_clauses(employment):
     _, clauses = employment
-    assert [c.number for c in clauses] == [str(n) for n in range(1, 12)]
+    numbered = [c.number for c in clauses if c.number]
+    assert numbered == [str(n) for n in range(1, 12)]
+
+
+def test_the_text_before_the_first_clause_is_kept(employment):
+    """The title, recitals and definition of the parties used to be discarded
+    outright, so a waiver buried in the recitals reached no rule at all."""
+    document, clauses = employment
+    preamble = clauses[0]
+    assert preamble.number is None
+    assert preamble.start_offset == 0
+    assert "EMPLOYMENT AGREEMENT" in preamble.text
+    assert document.text[preamble.start_offset : preamble.end_offset] == preamble.text
 
 
 def test_every_clause_offset_round_trips_to_its_own_text(employment):

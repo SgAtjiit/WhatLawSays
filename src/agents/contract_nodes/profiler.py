@@ -143,16 +143,32 @@ async def run_contract_profiler(state: ContractGraphState) -> ContractGraphState
         position = PartyPosition.UNKNOWN
         position_source = "UNKNOWN"
 
-    # An inferred side that does not belong to this contract type is not usable:
-    # a LANDLORD on an employment contract would mis-score every finding.
+    # A side that does not belong to this contract type is not usable: a LANDLORD
+    # on an employment contract would mis-score every finding. Which of the two
+    # gives way depends on where each came from. The API already rejects a
+    # user-declared pair that disagrees, so a disagreement here means at least
+    # one side of it was guessed -- and a guess must never overrule the person
+    # who told us. Discarding their answer and then asking them for it again was
+    # the worst of both.
     valid = POSITIONS_BY_TYPE.get(contract_type)
     if valid and position != PartyPosition.UNKNOWN and position not in valid:
-        notes.append(
-            f"Discarded inferred side {position.value}: not a party to a "
-            f"{contract_type.value} contract."
-        )
-        position = PartyPosition.UNKNOWN
-        position_source = "UNKNOWN"
+        if position_source == "USER_DECLARED":
+            owner = next(
+                (t for t, pair in POSITIONS_BY_TYPE.items() if position in pair), None
+            )
+            notes.append(
+                f"Inferred type {contract_type.value} disagrees with the side you "
+                f"gave ({position.value}); keeping your answer."
+            )
+            contract_type = owner or ContractType.UNKNOWN
+            confidence = min(confidence, 0.4)
+        else:
+            notes.append(
+                f"Discarded inferred side {position.value}: not a party to a "
+                f"{contract_type.value} contract."
+            )
+            position = PartyPosition.UNKNOWN
+            position_source = "UNKNOWN"
 
     pipeline_logger.log_step(
         STAGE,

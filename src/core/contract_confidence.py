@@ -47,6 +47,13 @@ UNGROUNDED_CAP = 0.50
 # anything: `_severity_for` returns the base severity for UNKNOWN, so every
 # asymmetric clause is scored as though the reader were neither party.
 UNKNOWN_POSITION_CAP = 0.65
+# When nothing in the document is numbered, every clause boundary is a guess and
+# each one mis-attributes whatever it splits. Measured across the labelled set
+# (scripts/calibrate_confidence.py), finding quality falls to about 0.45 under
+# paragraph fallback while the weighted mean alone still reported 0.81 -- the
+# segmentation component carries only 0.20 of the weight, so it cannot express
+# this on its own.
+PARAGRAPH_FALLBACK_CAP = 0.70
 
 MAX_CONFIDENCE = 0.95
 MIN_CONFIDENCE = 0.05
@@ -198,6 +205,10 @@ def estimate_contract_confidence(
         extra.append((UNGROUNDED_CAP, f"ungrounded_quotes<={UNGROUNDED_CAP:.2f}"))
     if position_source == "UNKNOWN":
         extra.append((UNKNOWN_POSITION_CAP, f"unknown_position<={UNKNOWN_POSITION_CAP:.2f}"))
+    if clauses and not any(getattr(c, "number", None) for c in clauses):
+        extra.append(
+            (PARAGRAPH_FALLBACK_CAP, f"guessed_clause_boundaries<={PARAGRAPH_FALLBACK_CAP:.2f}")
+        )
 
     score, caps = _apply_caps(score, llm_available, reranker_available, extra)
 
@@ -210,6 +221,11 @@ def estimate_contract_confidence(
         notes.append(
             "No reviewing side was established, so severities are unweighted: the same "
             "clause is a serious risk to one party and routine to the other."
+        )
+    if clauses and not any(getattr(c, "number", None) for c in clauses):
+        notes.append(
+            "This document carries no clause numbering, so the boundaries between "
+            "clauses were inferred from its paragraphs and may not match how it reads."
         )
     if not llm_available:
         notes.append("LLM unavailable; deterministic rules produced this review.")

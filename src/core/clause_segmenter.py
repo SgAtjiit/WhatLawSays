@@ -43,9 +43,49 @@ _ANNEX_HEADING = re.compile(
 # on the text immediately following the marker.
 # The hyphen must not terminate a heading: "NON-COMPETITION" would otherwise be
 # read as the heading "NON", and the rest of the word would fall into the body.
+#
+# A newline or a colon after a short capitalised run is strong evidence of a
+# caption. A full stop is not: it also ends the first sentence of a clause, and
+# it sits inside "Rs.", "No.", "Pvt." and "Mrs.". Accepting it unconditionally
+# turned "The Lessee shall pay a penalty of Rs." into the heading and left
+# "1,000 per day of delay" as the body -- so PENALTY_STIPULATION, which needs
+# both halves, matched nothing at all. A full stop is now only a terminator when
+# what precedes it reads as a caption rather than as prose (see _is_caption).
 _HEADING = re.compile(
-    r"^(?P<heading>[A-Z][^\n.;:]{2,70}?)\s*(?::\s*|\.(?=\s)|\n)",
+    r"^(?P<heading>[A-Z][^\n.;:]{2,70}?)\s*(?P<term>:\s*|\.(?=\s)|\n)",
 )
+
+# Words that carry no capital in a Title Case caption.
+_CAPTION_MINOR = frozenset(
+    "a an the and or of for to in on at by with from under over into per as".split()
+)
+
+
+def _is_caption(candidate: str) -> bool:
+    """Whether a run of text reads as a clause caption rather than as prose.
+
+    A caption is ALL CAPS ("TERMINATION") or Title Case ("Termination Of
+    Employment"). Prose has lowercase content words, which is what separates
+    "The Company may terminate this Agreement forthwith" from a real heading.
+    """
+    words = candidate.split()
+    if not words or len(words) > 9:
+        return False
+    letters = [w for w in words if any(c.isalpha() for c in w)]
+    if not letters:
+        return False
+    if all(w.upper() == w for w in letters):
+        return True
+    for index, word in enumerate(letters):
+        stripped = word.strip("()[]-,")
+        if not stripped or not stripped[0].isalpha():
+            continue
+        if stripped[0].isupper():
+            continue
+        # A lowercase word is only allowed if it is a minor word, and never first.
+        if index == 0 or stripped.lower() not in _CAPTION_MINOR:
+            return False
+    return True
 
 # Lines that look like markers but are not: money, dates and bare years lead many
 # a contract line and would otherwise shatter a clause into fragments.
@@ -67,9 +107,14 @@ def _top_level(number: str) -> Optional[int]:
     return int(head) if head.isdigit() else None
 
 
-def _collect_markers(text: str) -> List[Tuple[int, str]]:
-    """Offsets and numbers of every plausible clause marker, in document order."""
-    found: Dict[int, str] = {}
+def _collect_markers(text: str) -> List[Tuple[int, str, int]]:
+    """Offsets, numbers and match ends of every plausible clause marker.
+
+    The match end is carried rather than re-derived: "Article 1 APPOINTMENT"
+    used to have only its first token stripped, leaving "1 APPOINTMENT" in the
+    body with no heading found at all.
+    """
+    found: Dict[int, Tuple[str, int]] = {}
     for pattern in (_DECIMAL, _SPELLED, _PAREN, _ANNEX_HEADING):
         for match in pattern.finditer(text):
             start = match.start()
@@ -79,11 +124,13 @@ def _collect_markers(text: str) -> List[Tuple[int, str]]:
                 continue
             # An earlier pattern wins the same offset: decimal numbering is more
             # reliable than a parenthesised letter, which also appears mid-list.
-            found.setdefault(start, match.group(1))
-    return sorted(found.items())
+            found.setdefault(start, (match.group(1), match.end()))
+    return [(start, number, end) for start, (number, end) in sorted(found.items())]
 
 
-def _drop_out_of_sequence(markers: Sequence[Tuple[int, str]]) -> List[Tuple[int, str]]:
+def _drop_out_of_sequence(
+    markers: Sequence[Tuple[int, str, int]]
+) -> List[Tuple[int, str, int]]:
     """Discard top-level markers that break the document's counting.
 
     A clause body containing "... within 30 days. 5. of the Schedule ..." can
@@ -91,16 +138,29 @@ def _drop_out_of_sequence(markers: Sequence[Tuple[int, str]]) -> List[Tuple[int,
     only ever moves forward, and by small steps, so a marker that jumps backwards
     or leaps ahead is noise.
     """
-    kept: List[Tuple[int, str]] = []
+    tops = [
+        _top_level(n) for _, n, _e in markers if "." not in n and _top_level(n) is not None
+    ]
+    position_in_tops = 0
+
+    kept: List[Tuple[int, str, int]] = []
     last_top = 0
-    for offset, number in markers:
+    for offset, number, marker_end in markers:
         top = _top_level(number)
         is_nested = "." in number or top is None
         if not is_nested:
-            if top <= last_top or top > last_top + 3:
+            following = tops[position_in_tops + 1] if position_in_tops + 1 < len(tops) else None
+            position_in_tops += 1
+            if top <= last_top:
+                continue
+            # A contract that skips numbers -- a clause deleted in negotiation --
+            # used to lose every marker after the gap, because the rejected one
+            # never advanced last_top and so poisoned all its successors. A jump
+            # is genuine when the next top-level marker carries on from it.
+            if top > last_top + 3 and following != top + 1:
                 continue
             last_top = top
-        kept.append((offset, number))
+        kept.append((offset, number, marker_end))
     return kept
 
 
@@ -112,6 +172,8 @@ def _split_heading(body: str) -> Tuple[Optional[str], str]:
     # A heading is a label, not a sentence. Anything with sentence punctuation or
     # too many words is clause text that merely starts with a capital.
     if len(heading.split()) > 9:
+        return None, body
+    if match.group("term").startswith(".") and not _is_caption(heading):
         return None, body
     return heading, body[match.end() :].lstrip()
 
@@ -132,16 +194,23 @@ def segment_clauses(document: ParsedDocument) -> List[Clause]:
     text = document.text
     markers = _drop_out_of_sequence(_collect_markers(text))
 
-    spans: List[Tuple[int, int, Optional[str]]] = []
+    spans: List[Tuple[int, int, Optional[str], int]] = []
     if len(markers) >= _MIN_MARKERS:
         covered = markers[-1][0] - markers[0][0]
         if covered >= _MIN_COVERAGE * max(len(text) - markers[0][0], 1):
-            for index, (start, number) in enumerate(markers):
+            # Everything before the first marker -- the title, recitals and the
+            # definition of the parties -- is real contract text and used to be
+            # discarded outright, so a waiver buried in the recitals was never
+            # seen by any rule.
+            preamble_end = markers[0][0]
+            if len(text[:preamble_end].strip()) >= _MIN_CLAUSE_CHARS:
+                spans.append((0, preamble_end, None, 0))
+            for index, (start, number, marker_end) in enumerate(markers):
                 end = markers[index + 1][0] if index + 1 < len(markers) else len(text)
-                spans.append((start, end, number))
+                spans.append((start, end, number, marker_end))
 
     if not spans:
-        spans = [(start, end, None) for start, end in _paragraph_blocks(text)]
+        spans = [(start, end, None, start) for start, end in _paragraph_blocks(text)]
 
     clauses: List[Clause] = []
     # A numbered heading with no body of its own ("4. TERMINATION" above 4.1) is
@@ -149,13 +218,12 @@ def segment_clauses(document: ParsedDocument) -> List[Clause]:
     # carried forward rather than emitted.
     inherited_heading: Optional[str] = None
 
-    for start, end, number in spans:
+    for start, end, number, marker_end in spans:
         raw = text[start:end]
         body = raw
         if number and not _ANNEX_HEADING.match(raw):
-            marker_match = re.match(r"^[ \t]*\(?[^\s)]{1,16}\)?[ \t.)]*", raw)
-            if marker_match:
-                body = raw[marker_match.end() :]
+            # The marker's own match end, recorded when it was found.
+            body = raw[max(marker_end - start, 0) :]
         heading, remainder = _split_heading(body.strip())
 
         if len(remainder.strip()) < _MIN_CLAUSE_CHARS:
@@ -169,9 +237,11 @@ def segment_clauses(document: ParsedDocument) -> List[Clause]:
         clause_text = raw.strip()
         offset_shift = raw.index(clause_text) if clause_text else 0
         clause_start = start + offset_shift
-        # Locate the body within the clause rather than recomputing it, so the
-        # recorded offset always addresses the same characters `remainder` holds.
-        body_index = clause_text.find(remainder[:40]) if remainder else -1
+        # Arithmetic, not a search. _split_heading only ever strips a prefix, so
+        # the remainder is a suffix of the clause -- but searching for its first
+        # 40 characters landed on the heading whenever the body opened by
+        # repeating it.
+        body_index = len(clause_text) - len(remainder) if remainder else -1
         clauses.append(
             Clause(
                 index=len(clauses),

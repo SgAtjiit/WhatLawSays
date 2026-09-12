@@ -50,7 +50,9 @@ async def run_red_flag_analyst(state: ContractGraphState) -> ContractGraphState:
     side = position.value.replace("_", " ").lower() if position != PartyPosition.UNKNOWN else "reviewing party"
 
     rule_findings = state.get("rule_findings", [])
-    covered = {(f.clause_index, f.rule_id) for f in rule_findings}
+    # Model findings are keyed by clause, title and located span (below); rule
+    # findings carry no span, so they do not seed this set.
+    covered = set()
 
     # On a retry only the clauses whose quotes failed to ground are revisited.
     scoped = state.get("ungrounded_clause_indices") if retry_count else None
@@ -111,7 +113,9 @@ async def run_red_flag_analyst(state: ContractGraphState) -> ContractGraphState:
                 + correction
                 + "\n[CLAUSES]\n" + "\n\n---\n\n".join(blocks)
             )
-            return await llm.ainvoke(prompt)
+            # The batch travels back with its result, so the writer below can
+            # restrict itself to the clauses this call actually saw.
+            return set(batch), await llm.ainvoke(prompt)
 
         outcome = await gather_batched(
             targets, settings.CONTRACT_HOT_BATCH, worker, settings.CONTRACT_LLM_CONCURRENCY
@@ -121,8 +125,18 @@ async def run_red_flag_analyst(state: ContractGraphState) -> ContractGraphState:
         # Groq returns None when the model answers in prose instead of
         # calling the structured-output tool -- a real and frequent
         # outcome, and one that used to crash the whole node.
-        for result in [r for r in outcome.results if r is not None]:
+        for allowed, result in [r for r in outcome.results if r and r[1] is not None]:
             for item in result.findings or []:
+                # A finding about a clause this batch never saw is grounded in
+                # nothing it read. On a scoped retry it also reintroduced a
+                # clause the first pass had already covered, duplicating it.
+                if item.clause_index not in allowed:
+                    suppressed.append({
+                        "clause_index": item.clause_index,
+                        "title": item.title,
+                        "reason": "clause was not in this batch",
+                    })
+                    continue
                 clause = clauses.get(item.clause_index)
                 if clause is None:
                     suppressed.append({"title": item.title, "reason": "unknown clause_index"})
@@ -139,13 +153,26 @@ async def run_red_flag_analyst(state: ContractGraphState) -> ContractGraphState:
                     })
                     continue
                 start, end, quote = located
-                key = (item.clause_index, f"LLM_{item.title.upper().replace(' ', '_')[:40]}")
+                if not item.title.strip():
+                    suppressed.append({
+                        "clause_index": item.clause_index,
+                        "quote": quote[:120],
+                        "reason": "finding had no title",
+                    })
+                    continue
+                # Keyed on the located span as well as the title. Two distinct
+                # findings whose titles agreed for 40 characters -- easily done,
+                # "... brought by third parties" beside "... brought by the
+                # Company" -- collapsed into one, and the second was lost with
+                # nothing recorded anywhere.
+                rule_id = f"LLM_{item.title.upper().replace(' ', '_')[:40]}"
+                key = (item.clause_index, rule_id, start, end)
                 if key in covered:
                     continue
                 covered.add(key)
                 llm_findings.append(
                     RedFlagFinding(
-                        rule_id=key[1],
+                        rule_id=rule_id,
                         title=item.title,
                         severity=item.severity,
                         clause_index=item.clause_index,

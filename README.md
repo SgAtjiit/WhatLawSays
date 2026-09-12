@@ -239,8 +239,35 @@ being recognised as unilateral amendment, and loan repayment schedules not class
 as payment terms. Model findings are not held to the answer key — they are not
 reproducible enough for one — and their quality is checked by grounding instead.
 `tests/test_evaluation.py` holds the floors (0.90 precision and recall, zero findings on
-clean contracts) so a regression fails the build. The confidence estimator itself is
-still uncalibrated; this measures the rules, not the score.
+clean contracts) so a regression fails the build.
+
+### Does the confidence score mean anything
+
+Strict calibration — when it says 0.7 it is right 70% of the time — needs far more
+labelled reviews than ten contracts on which the rules are near-perfect. That remains
+unfitted, and the score is still an estimate. What `scripts/calibrate_confidence.py`
+does measure is **reliability**: each labelled contract is reviewed under seven
+deliberate degradations, and the score must move the right way by the right amount.
+
+| condition | predicted | observed | |
+|---|---|---|---|
+| everything healthy | 0.937 | 1.000 | |
+| only half the contract analysed | 0.832 | 1.000 | |
+| cross-encoder unavailable | 0.750 | 1.000 | capped |
+| clause boundaries guessed | 0.700 | 0.754 | capped |
+| no reviewing side declared | 0.650 | 0.912 | capped |
+| a quote not in the document | 0.622 | 0.964 | capped |
+| no model reached at all | 0.600 | 1.000 | capped |
+
+Every gap is the score reading *lower* than measured quality, which is the right
+direction to be wrong in here. The ordering and the caps are asserted in
+`tests/test_calibration.py`, so an estimator change that makes a review
+over-confident fails the build.
+
+Building this found a real miscalibration: with no clause numbering anywhere, every
+boundary is a guess, yet the weighted mean alone still reported 0.81 — segmentation
+carries only 0.20 of the weight and could not express it. It is now capped at 0.70,
+which the measurement puts within 0.05 of observed quality.
 
 ### Frontend
 

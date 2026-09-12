@@ -90,7 +90,8 @@ def test_uploading_a_contract_returns_a_review(client, contract_bytes):
     assert body["position"] == "EMPLOYEE"
     assert body["position_source"] == "USER_DECLARED"
     assert body["findings"]
-    assert body["clause_count"] == 11
+    # 11 numbered clauses plus the preamble, which is real contract text.
+    assert body["clause_count"] == 12
     assert body["disclaimer"]
 
 

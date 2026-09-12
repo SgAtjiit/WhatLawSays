@@ -295,8 +295,10 @@ curl -X POST http://localhost:8000/api/v1/contracts \
 `position` matters more than it looks: the same clause is scored CRITICAL for the
 employee and INFO for the employer, because that is what it actually is.
 
-Score the rules against the labelled contracts:
+Score the rules against the labelled contracts, and check the confidence score
+still moves the right way when a review is degraded:
 
 ```bash
 uv run python -m scripts.evaluate_contract_review --verbose
+uv run python -m scripts.calibrate_confidence --verbose
 ```

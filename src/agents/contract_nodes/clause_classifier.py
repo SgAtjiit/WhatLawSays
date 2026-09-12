@@ -24,7 +24,10 @@ def _format(clause) -> str:
 
 
 async def run_clause_classifier(state: ContractGraphState) -> ContractGraphState:
-    clauses = state.get("clauses", [])
+    # Copies: the node used to relabel the caller's Clause objects in place, so
+    # the deterministic categories recorded below were already the model's by the
+    # time they were read, and a re-run saw different input from the first.
+    clauses = [c.model_copy(deep=True) for c in state.get("clauses", [])]
     position = PartyPosition(state.get("position", PartyPosition.UNKNOWN.value))
 
     pipeline_logger.log_step(

@@ -44,10 +44,18 @@ _EXTENSION_MEDIA_TYPES = {
 # Characters PDF producers emit that carry no meaning and break naive matching.
 _INVISIBLES = dict.fromkeys(map(ord, "­​‌‍﻿"), None)
 
-# A word split across a line break by the typesetter. Rejoined only when the
-# break sits between two lowercase letters, so genuine hyphenated compounds at a
-# line end ("Non-\nDisclosure") are left alone.
+# A hyphenated word split across a line break. The hyphen is KEPT and only the
+# newline removed.
+#
+# Dropping it produced "twentyfour months" and "interestfree deposit" in the
+# quoted evidence shown to the reader, because contracts break exactly these
+# compounds at line ends. The alternative error -- leaving a syllable break as
+# "termi-nation" -- needs the producer to hyphenate mid-word, which Word does
+# not do by default and which none of the contract PDFs measured here do. The
+# rule patterns already spell hyphenated compounds as "[- ]?", so a preserved
+# hyphen costs nothing there.
 _HYPHEN_LINEBREAK = re.compile(r"([a-z])-\n([a-z])")
+_HYPHEN_JOIN = r"\1-\2"
 
 _TRAILING_SPACE = re.compile(r"[ \t]+(?=\n)")
 _HORIZONTAL_RUN = re.compile(r"[ \t\f\v]+")
@@ -67,8 +75,8 @@ def normalize(raw: str) -> str:
     """
     text = (raw or "").replace("\r\n", "\n").replace("\r", "\n")
     text = text.translate(_INVISIBLES)
-    text = text.replace(" ", " ")
-    text = _HYPHEN_LINEBREAK.sub(r"\1\2", text)
+    text = text.replace(" ", " ").replace("\x00", "")
+    text = _HYPHEN_LINEBREAK.sub(_HYPHEN_JOIN, text)
     text = _HORIZONTAL_RUN.sub(" ", text)
     text = _TRAILING_SPACE.sub("", text)
     text = _BLANK_RUN.sub("\n\n", text)
@@ -125,15 +133,30 @@ def _extract_pdf(data: bytes) -> Tuple[List[str], int]:
             f"PDF has {page_count} pages, above the {MAX_PDF_PAGES}-page limit."
         )
 
-    pages = []
-    for page in reader.pages:
+    pages, unreadable = [], []
+    for index, page in enumerate(reader.pages):
         try:
-            pages.append(page.extract_text() or "")
+            text = page.extract_text() or ""
         except Exception:
-            # One unreadable page must not lose the other 40. The shortfall is
-            # caught by the text-layer check below.
-            pages.append("")
-    return pages, page_count
+            text = ""
+        if len(text.strip()) < MIN_CHARS_PER_PAGE:
+            unreadable.append(index + 1)
+        pages.append(text)
+    return pages, page_count, unreadable
+
+
+def _element_text(element) -> str:
+    """All text under an element, tracked-change insertions included.
+
+    `Paragraph.text` reads only the runs directly under w:p, so text the other
+    side added in Track Changes -- which lives in a w:ins wrapper -- was dropped
+    silently. Reviewing a redlined contract is the whole point, and the review
+    was reading the version from before their edits. Deletions stay out: Word
+    puts those in w:delText, which this never sees.
+    """
+    from docx.oxml.ns import qn
+
+    return "".join(node.text or "" for node in element.iter(qn("w:t")))
 
 
 def _iter_docx_blocks(document) -> List[str]:
@@ -145,23 +168,114 @@ def _iter_docx_blocks(document) -> List[str]:
     """
     from docx.oxml.ns import qn
     from docx.table import Table
-    from docx.text.paragraph import Paragraph
 
-    blocks = []
-    for child in document.element.body.iterchildren():
-        if child.tag == qn("w:p"):
-            text = Paragraph(child, document).text.strip()
-            if text:
-                blocks.append(text)
-        elif child.tag == qn("w:tbl"):
-            for row in Table(child, document).rows:
-                cells = [c.text.strip().replace("\n", " ") for c in row.cells]
-                # Word repeats a merged cell's text once per underlying grid
-                # column; collapsing neighbouring duplicates keeps the row honest.
-                deduped = [c for i, c in enumerate(cells) if c and (i == 0 or c != cells[i - 1])]
-                if deduped:
-                    blocks.append(" | ".join(deduped))
+    blocks: List[str] = []
+    # Word's automatic numbering lives in w:numPr, not in the text, so a
+    # contract numbered that way arrived with no clause numbers at all and every
+    # finding cited "paragraph 7" instead of the clause the reader can see. The
+    # counters are rebuilt here per (numId, level), deeper levels resetting when
+    # a shallower one advances, and the number is written back into the text.
+    counters: Dict[tuple, List[int]] = {}
+
+    styles_element = document.styles.element
+    resolved_styles: Dict[str, object] = {}
+
+    def style_numbering(style_id: str, depth: int = 0):
+        """numPr inherited from a paragraph style, following w:basedOn.
+
+        Word's own "List Number" and numbered heading styles keep the numbering
+        in styles.xml rather than on the paragraph, so looking only at the
+        paragraph found nothing for the most common way a contract is numbered.
+        """
+        if not style_id or depth > 8:
+            return None
+        if style_id in resolved_styles:
+            return resolved_styles[style_id]
+        found = None
+        for style in styles_element.findall(qn("w:style")):
+            if style.get(qn("w:styleId")) != style_id:
+                continue
+            properties = style.find(qn("w:pPr"))
+            if properties is not None and properties.find(qn("w:numPr")) is not None:
+                found = properties.find(qn("w:numPr"))
+            else:
+                based_on = style.find(qn("w:basedOn"))
+                if based_on is not None:
+                    found = style_numbering(based_on.get(qn("w:val")), depth + 1)
+            break
+        resolved_styles[style_id] = found
+        return found
+
+    def numbering_prefix(paragraph) -> str:
+        properties = paragraph.find(qn("w:pPr"))
+        number_properties = None
+        if properties is not None:
+            number_properties = properties.find(qn("w:numPr"))
+            if number_properties is None:
+                style = properties.find(qn("w:pStyle"))
+                if style is not None:
+                    number_properties = style_numbering(style.get(qn("w:val")))
+        if number_properties is None:
+            return ""
+        def value(tag, default=0):
+            node = number_properties.find(qn(tag))
+            if node is None:
+                return default
+            raw = node.get(qn("w:val"))
+            return int(raw) if raw is not None and raw.lstrip("-").isdigit() else default
+        num_id, level = value("w:numId", -1), value("w:ilvl", 0)
+        if num_id < 0 or level > 8:
+            return ""
+        counts = counters.setdefault(num_id, [])
+        while len(counts) <= level:
+            counts.append(0)
+        counts[level] += 1
+        del counts[level + 1 :]
+        return ".".join(str(n) for n in counts[: level + 1]) + " "
+
+    def walk(element):
+        for child in element.iterchildren():
+            if child.tag == qn("w:p"):
+                text = " ".join(_element_text(child).split())
+                if text:
+                    blocks.append(numbering_prefix(child) + text)
+            elif child.tag == qn("w:tbl"):
+                for row in Table(child, document).rows:
+                    cells, seen = [], None
+                    for cell in row.cells:
+                        # Word repeats a merged cell once per underlying grid
+                        # column. Comparing the ELEMENT catches that; comparing
+                        # the text also swallowed two distinct cells that
+                        # happened to read the same, such as a repeated amount.
+                        if cell._tc is seen:
+                            continue
+                        seen = cell._tc
+                        # Reads nested tables too, which were dropped entirely.
+                        value = " ".join(_element_text(cell._tc).split())
+                        if value:
+                            cells.append(value)
+                    if cells:
+                        blocks.append(" | ".join(cells))
+            elif child.tag in (qn("w:sdt"), qn("w:sdtContent"), qn("w:customXml")):
+                # A content control. Everything inside one used to vanish, and a
+                # whole clause with it, with nothing said about the loss.
+                walk(child)
+
+    walk(document.element.body)
     return blocks
+
+
+def _docx_warnings(document) -> List[str]:
+    from docx.oxml.ns import qn
+
+    body = document.element.body
+    if any(True for _ in body.iter(qn("w:ins"))) or any(True for _ in body.iter(qn("w:del"))):
+        return [
+            "This file contains unaccepted tracked changes. Insertions are included "
+            "in the review and deletions are not, so it reads as the document would "
+            "if every change were accepted."
+        ]
+    return []
 
 
 def _extract_docx(data: bytes) -> List[str]:
@@ -174,7 +288,58 @@ def _extract_docx(data: bytes) -> List[str]:
         document = docx.Document(io.BytesIO(data))
     except Exception as exc:
         raise DocumentParseError(f"Could not open DOCX: {exc}") from exc
-    return _iter_docx_blocks(document)
+    return _iter_docx_blocks(document), _docx_warnings(document)
+
+
+def _decode_text(data: bytes):
+    """Decode a text upload, detecting UTF-16.
+
+    A UTF-16 file decoded as UTF-8 becomes text with a NUL between every letter:
+    it segments into one clause of gibberish and every rule silently matches
+    nothing. Windows editors write UTF-16 routinely, and without a BOM there is
+    nothing to notice but the NULs themselves.
+    """
+    for bom, encoding in (
+        (b"\xef\xbb\xbf", "utf-8-sig"),
+        (b"\xff\xfe", "utf-16"),
+        (b"\xfe\xff", "utf-16"),
+    ):
+        if data.startswith(bom):
+            try:
+                return data.decode(encoding), None
+            except UnicodeDecodeError:
+                break
+
+    try:
+        text = data.decode("utf-8")
+        if text.count("\x00") * 3 < len(text):
+            return text, None
+    except UnicodeDecodeError:
+        text = None
+
+    # No BOM, but NUL-riddled: almost certainly UTF-16 written without one.
+    # Which endianness is decided by WHERE the NULs sit, not by whether the
+    # decode succeeds -- BE text decoded as LE yields CJK-range characters with
+    # no NUL at all, so a NUL test alone happily accepts the wrong one.
+    head = data[:4096]
+    even_nuls = head[0::2].count(0)
+    odd_nuls = head[1::2].count(0)
+    order = ["utf-16-le", "utf-16-be"] if odd_nuls >= even_nuls else ["utf-16-be", "utf-16-le"]
+    for encoding in order:
+        try:
+            candidate = data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        if "\x00" not in candidate:
+            return candidate, None
+
+    if text is not None:
+        return text, None
+    return (
+        data.decode("utf-8", errors="replace"),
+        "File was not valid UTF-8; undecodable bytes were replaced. "
+        "Check the text for corruption before relying on this review.",
+    )
 
 
 def parse_document(
@@ -195,18 +360,16 @@ def parse_document(
     page_count: Optional[int] = None
 
     if kind == "pdf":
-        raw_pages, page_count = _extract_pdf(data)
+        raw_pages, page_count, unreadable = _extract_pdf(data)
     elif kind == "docx":
-        raw_pages = ["\n\n".join(_extract_docx(data))]
+        blocks, docx_warnings = _extract_docx(data)
+        raw_pages = ["\n\n".join(blocks)]
+        warnings.extend(docx_warnings)
     else:
-        try:
-            raw_pages = [data.decode("utf-8")]
-        except UnicodeDecodeError:
-            raw_pages = [data.decode("utf-8", errors="replace")]
-            warnings.append(
-                "File was not valid UTF-8; undecodable bytes were replaced. "
-                "Check the text for corruption before relying on this review."
-            )
+        decoded, encoding_warning = _decode_text(data)
+        raw_pages = [decoded]
+        if encoding_warning:
+            warnings.append(encoding_warning)
 
     # Normalize each page before joining so recorded offsets survive the join.
     normalized_pages = [normalize(page) for page in raw_pages]
@@ -219,6 +382,25 @@ def parse_document(
     text = separator.join(normalized_pages)
 
     if kind == "pdf" and page_count:
+        # Averaged density hides a partial scan: 8 good pages among 20 pass it
+        # comfortably while 12 pages of the contract were never read at all.
+        if unreadable and len(unreadable) * 2 > page_count:
+            raise DocumentParseError(
+                f"{len(unreadable)} of this PDF's {page_count} pages have no "
+                "readable text, so most of the contract could not be read. It is "
+                "most likely a scan or an image. Run OCR on it and upload the "
+                "text version -- reviewing it as-is would report no problems "
+                "simply because nothing could be read."
+            )
+        if unreadable:
+            shown = ", ".join(str(n) for n in unreadable[:10])
+            warnings.append(
+                f"{len(unreadable)} of {page_count} pages had no readable text "
+                f"(page{'s' if len(unreadable) > 1 else ''} {shown}"
+                f"{' and others' if len(unreadable) > 10 else ''}). Anything on "
+                "them was not reviewed."
+            )
+
         density = len(text) / page_count
         if density < MIN_CHARS_PER_PAGE:
             raise DocumentParseError(
