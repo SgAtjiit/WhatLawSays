@@ -125,9 +125,23 @@ Note that `src/config.py` is **gitignored** (the bare `config.py` pattern in `.g
 catches it), so a fresh clone has no config at all and the app will not import — set
 `GROQ_API_KEY` in `.env` in that case.
 
+If you recreate `src/config.py`, the contract-review pipeline also needs these fields on
+`Settings` (values are the measured defaults; see the comments in the file for why):
+
+```python
+CONTRACT_LLM_CONCURRENCY: int = 4     # 12 concurrent succeed, 40 rate-limit 45%
+CONTRACT_LLM_CALL_BUDGET: int = 40    # worst case is ~30 calls; room for retries
+CONTRACT_HOT_BATCH: int = 4
+CONTRACT_WARM_BATCH: int = 10
+CONTRACT_CLASSIFY_BATCH: int = 12
+```
+
+Without them `settings.CONTRACT_LLM_CONCURRENCY` raises and every contract review fails.
+
 ## 6. Seed the legal corpus
 
-Indexes 1719 sections (BNS, BNSS, BSA, Constitution, IT Act, POSH Act). Point ids are
+Indexes 2336 sections (BNS, BNSS, BSA, Constitution, IT Act, POSH Act, and the
+contract pool: Contract Act, TPA, CPA, Arbitration Act, SRA, DPDP Act). Point ids are
 derived from act + section, so re-running is idempotent. The first run downloads the
 `bge-small-en-v1.5` and `Qdrant/bm25` ONNX models. Takes ~2 minutes.
 
@@ -140,7 +154,7 @@ Verify:
 ```bash
 curl -s http://localhost:6333/collections/whatlawsays_legal_corpus \
   | python3 -c "import sys,json; d=json.load(sys.stdin)['result']; print(d['points_count'], d['status'])"
-# -> 1719 green
+# -> 2336 green
 ```
 
 ## 7. Run it (two terminals)
@@ -257,4 +271,32 @@ degraded pipeline can no longer report the same confidence as a healthy one.
 ```bash
 kill $(lsof -ti:8000) $(lsof -ti:8501)
 docker compose down          # add -v to drop volumes
+```
+
+
+## Contract review
+
+Start the API, the worker, and the UI:
+
+```bash
+uv run uvicorn src.main:app --reload            # API, including /api/v1/contracts
+uv run python -m scripts.contract_worker        # consumes queued reviews
+uv run streamlit run frontend/app.py            # multipage UI
+```
+
+Review a contract from the shell:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/contracts \
+  -F "file=@my-offer-letter.pdf" \
+  -F "contract_type=EMPLOYMENT" -F "position=EMPLOYEE"
+```
+
+`position` matters more than it looks: the same clause is scored CRITICAL for the
+employee and INFO for the employer, because that is what it actually is.
+
+Score the rules against the labelled contracts:
+
+```bash
+uv run python -m scripts.evaluate_contract_review --verbose
 ```

@@ -1,0 +1,33 @@
+NON-DISCLOSURE AGREEMENT
+
+This Non-Disclosure Agreement is entered into on 8 February 2025 between
+Orion Fintech Private Limited, Bengaluru (hereinafter "the Disclosing Party")
+and Mr. R. Verma, a software consultant residing at Whitefield, Bengaluru
+(hereinafter "the Receiving Party").
+
+1. CONFIDENTIAL INFORMATION
+Confidential Information means any information disclosed by the Disclosing Party
+in any form, whether or not marked as confidential.
+
+2. OBLIGATIONS OF THE RECEIVING PARTY
+The Receiving Party shall not disclose any Confidential Information to any third
+party and shall use it solely for the purpose of the engagement. The obligations
+of confidentiality shall survive the termination of this Agreement in perpetuity.
+
+3. RESTRICTION ON ENGAGEMENT
+The Receiving Party shall not, for a period of thirty six months after the
+termination of this Agreement, be engaged by or render services to any competing
+business in the financial technology sector anywhere in India.
+
+4. LIQUIDATED DAMAGES
+In the event of any breach of this Agreement the Receiving Party shall pay to the
+Disclosing Party liquidated damages of Rs. 25,00,000 in addition to any other
+remedy available.
+
+5. AMENDMENT
+The Disclosing Party reserves the right to amend these terms at any time at its
+sole discretion by written notice to the Receiving Party.
+
+6. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by the laws of Singapore and the courts at
+Singapore shall have exclusive jurisdiction over any dispute arising hereunder.
