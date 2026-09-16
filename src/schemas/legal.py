@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -119,10 +119,30 @@ class ImmediateActionStep(BaseModel):
 
 
 class LegalAnalysisResponse(BaseModel):
-    status: str = Field(..., description="SUCCESS, UNDETERMINED, or NEEDS_CLARIFICATION")
+    status: str = Field(
+        ...,
+        description="SUCCESS, PARTIAL_SUCCESS, UNDETERMINED, or NEEDS_CLARIFICATION",
+    )
     scenario_domain: str = Field(default="POTENTIAL_CRIMINAL", description="Evaluated scenario domain")
     offense_status: str = Field(default="UNDETERMINED", description="Evaluated offense status")
-    confidence_score: float = Field(..., ge=0.0, le=1.0)
+    confidence_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Confidence estimate in [0, 1]. Derived from measured retrieval relevance, "
+            "statutory element support, verification outcome and fact completeness. "
+            "Not a calibrated probability -- see confidence_basis for the breakdown."
+        ),
+    )
+    confidence_basis: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Auditable breakdown behind confidence_score: per-component values, "
+            "per-offense element support and grounding, any caps applied because a "
+            "pipeline stage degraded, and human-readable notes."
+        ),
+    )
     reason: Optional[str] = Field(None, description="Primary legal justification or explanation for the status")
     extracted_facts: ExtractedFacts
     identified_offenses: List[OffenseAnalysis] = []
@@ -139,6 +159,13 @@ class LegalAnalysisResponse(BaseModel):
         default=[], description="Statutory duties under Indian law (e.g. BNSS Section 33 obligation to report)"
     )
     clarification_questions: List[str] = []
+    excluded_provisions: List[Dict[str, Any]] = Field(
+        default=[],
+        description=(
+            "Sections excluded because a mandatory element is contradicted by the "
+            "supplied facts. Evidence for a NOT_ESTABLISHED finding."
+        ),
+    )
     disclaimer: str = (
         "This platform provides legal information based on BNS/BNSS/BSS, not formal legal advice."
     )

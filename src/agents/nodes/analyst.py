@@ -40,7 +40,10 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
     retrieved_chunks = state.get("retrieved_chunks", [])
     scenario_text = state.get("scenario_text", "").lower()
 
+    llm_available = state.get("llm_available", True)
+
     offenses: List[OffenseAnalysis] = []
+    contradicted_provisions: List[dict] = []
     applied_defences: List[str] = []
     procedural_provisions: List[str] = []
     action_steps: List[ImmediateActionStep] = []
@@ -91,7 +94,7 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
             "   - For every candidate section, decompose it into its mandatory statutory elements in `element_audits`.\n"
             "   - Set `applicability_status` = 'ESTABLISHED' if ALL mandatory elements are 'SUPPORTED'.\n"
             "   - Set `applicability_status` = 'POTENTIAL_UNDER_INVESTIGATION' if core action matches but key elements are 'UNPROVEN' due to missing facts.\n"
-            "   - If ANY element is 'CONTRADICTED_BY_FACT', EXCLUDE the section immediately!\n"
+            "   - If ANY element is 'CONTRADICTED_BY_FACT', EXCLUDE the section from `offenses` -- but STILL RETURN IT with its element_audits so the exclusion is recorded as a finding. Do not silently omit it.\n"
             "4. SECTION-SPECIFIC STATUTORY EXCEPTIONS:\n"
             "   - Inspect candidate section text for internal exceptions (e.g., Exceptions 1-5 under BNS Section 101/103 Murder: Grave Provocation, Exceeding Self Defence, Sudden Fight, etc., or Exceptions to Defamation BNS 356).\n"
             "   - Evaluate if any section exception applies based on explicit facts and populate `statutory_exceptions` (e.g., Exception 4 Sudden Fight -> Reduces Murder to Culpable Homicide).\n"
@@ -128,6 +131,26 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                     applied_defences.append(def_str)
                 continue
 
+            # A contradicted element excludes the section from the offenses array,
+            # but the exclusion is itself a finding and must survive as data.
+            if any(
+                str(getattr(a, "status", "")).upper() == "CONTRADICTED_BY_FACT"
+                for a in (o.element_audits or [])
+            ):
+                contradicted_provisions.append(
+                    {
+                        "act_name": o.act_name,
+                        "section_number": o.section_number,
+                        "offense_description": o.offense_description,
+                        "contradicted_elements": [
+                            a.element_name
+                            for a in (o.element_audits or [])
+                            if str(getattr(a, "status", "")).upper() == "CONTRADICTED_BY_FACT"
+                        ],
+                    }
+                )
+                continue
+
             offenses.append(o)
 
     except Exception as e:
@@ -136,6 +159,7 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
             f"Groq API Info ({type(e).__name__}). Using Strict Statutory Element & Categorization Engine.",
             status="WARNING",
         )
+        llm_available = False
         offenses = []
         applied_defences = []
         procedural_provisions = []
@@ -157,13 +181,11 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
             bailable = chunk.get("bailable")
             cognizable = chunk.get("cognizable")
 
-            # 1. Procedural / BNSS Filter
+            # 1. Procedural / Definitional Filter
+            # This pool is BNS-only, so anything non-substantive here (definitions,
+            # repeals, preliminary provisions) is simply not an offence. Procedural
+            # provisions come from their own retrieval pass, not from this loop.
             if "nagrik" in act_lower or "nagarik" in act_lower or "bnss" in act_lower or "crpc" in act_lower or "sakshya" in act_lower or "bsa" in act_lower or any(w in title_lower for w in ["definition", "procedure", "report", "diary", "examination of witness", "repeal", "local inquiry"]):
-                # Only include materially relevant procedural sections (search, seizure, reporting) and exclude generic definitions or summons
-                if not any(w in title_lower for w in ["definition", "repeal", "summons for petty", "effect of error"]):
-                    proc_entry = f"{act_name} Section {sec_num}: {title}"
-                    if proc_entry not in procedural_provisions and len(procedural_provisions) < 3:
-                        procedural_provisions.append(proc_entry)
                 continue
 
             # 2. General Exception / Self-Defense Filter
@@ -173,7 +195,14 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                     applied_defences.append(def_entry)
                 continue
 
-            # 3. Specific Offense Statutory Element Audits
+            # 3. Penalty Gate: a provision that prescribes no penalty cannot create
+            # an offence (e.g. POSH s.8 Grants and audit, s.4 Constitution of the
+            # Internal Complaints Committee). Checked with `is False` so a chunk
+            # indexed before this flag existed is not silently dropped.
+            if chunk.get("prescribes_penalty") is False:
+                continue
+
+            # 4. Specific Offense Statutory Element Audits
             # Dowry Death (Sec 80)
             if "80" in sec_num or "dowry" in title_lower:
                 if "dowry" not in ef_joined and "husband" not in ef_joined and "marriage" not in ef_joined:
@@ -232,6 +261,14 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                         f"Element Audit: Attempt to Murder ({sec_num}) CONTRADICTED_BY_FACT (death occurred). DO NOT ASSERT.",
                         status="SUCCESS",
                     )
+                    contradicted_provisions.append(
+                        {
+                            "act_name": act_name,
+                            "section_number": f"Section {sec_num}",
+                            "offense_description": title,
+                            "contradicted_elements": ["Death occurred, so an attempt cannot be made out."],
+                        }
+                    )
                     continue
 
             # Rash or Negligent Act (Sec 106)
@@ -241,6 +278,14 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                         "AGENT 3: LEGAL ANALYST",
                         f"Element Audit: Negligence ({sec_num}) CONTRADICTED_BY_FACT (act was intentional/voluntary). DO NOT ASSERT.",
                         status="SUCCESS",
+                    )
+                    contradicted_provisions.append(
+                        {
+                            "act_name": act_name,
+                            "section_number": f"Section {sec_num}",
+                            "offense_description": title,
+                            "contradicted_elements": ["The act was intentional or voluntary, not negligent."],
+                        }
                     )
                     continue
 
@@ -271,6 +316,14 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                         "AGENT 3: LEGAL ANALYST",
                         f"Element Audit: Trespass ({sec_num}) CONTRADICTED_BY_FACT (invitation/permission exists). DO NOT ASSERT.",
                         status="SUCCESS",
+                    )
+                    contradicted_provisions.append(
+                        {
+                            "act_name": act_name,
+                            "section_number": f"Section {sec_num}",
+                            "offense_description": title,
+                            "contradicted_elements": ["A valid invitation, permission or consent exists."],
+                        }
                     )
                     continue
 
@@ -342,6 +395,20 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
                     source_verified=True,
                 )
             )
+
+    # Procedural and constitutional provisions come from their own act-scoped
+    # retrieval pass (BNSS / BSA / Constitution) and feed the procedural tab only.
+    # They are never candidates for the offences array.
+    for chunk in state.get("procedural_chunks", []):
+        title = str(chunk.get("title", ""))
+        title_lower = title.lower()
+        # Keep the existing notion of materially relevant: drop generic definitions,
+        # repeals and boilerplate.
+        if any(w in title_lower for w in ["definition", "repeal", "summons for petty", "effect of error"]):
+            continue
+        entry = f"{chunk.get('act', '')} {chunk.get('section_number', '')}: {title}"
+        if entry not in procedural_provisions and len(procedural_provisions) < 5:
+            procedural_provisions.append(entry)
 
     # Fallback/Supplemental Action Steps Generation if missing
     ef_joined = (" ".join(explicit_facts) + " " + scenario_text).lower()
@@ -457,5 +524,7 @@ async def run_legal_analyst(state: GraphState) -> GraphState:
         "procedural_provisions": procedural_provisions,
         "immediate_action_steps": action_steps,
         "citizen_duties": duties,
+        "contradicted_provisions": contradicted_provisions,
         "retry_count": retry_count + 1,
+        "llm_available": llm_available,
     }

@@ -1,8 +1,43 @@
-from typing import Any, Dict, List
+import uuid
+from typing import Any, Dict, List, Optional
 from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import AsyncQdrantClient, models
 from src.config import settings
 from src.schemas.corpus import LegalSectionDoc
+
+# Act names and retrieval pools live in `acts` so they can be imported without
+# loading the embedding models below. Re-exported here for existing callers.
+from src.core.acts import (  # noqa: F401
+    ACT_ARBITRATION,
+    ACT_BNS,
+    ACT_BNSS,
+    ACT_BSA,
+    ACT_CONSTITUTION,
+    ACT_CONSUMER,
+    ACT_CONTRACT,
+    ACT_DPDP,
+    ACT_IT,
+    ACT_POSH,
+    ACT_SPECIFIC_RELIEF,
+    ACT_TRANSFER_OF_PROPERTY,
+    CONTRACT_ACTS,
+    PROCEDURAL_ACTS,
+    SUBSTANTIVE_ACTS,
+)
+
+# Namespace for deterministic point ids (see _point_id).
+_POINT_NAMESPACE = uuid.UUID("6f9619ff-8b86-d011-b42d-00c04fc964ff")
+
+
+def _point_id(doc: LegalSectionDoc) -> str:
+    """Stable id derived from the act and section.
+
+    The previous scheme numbered points by their position in the batch, so
+    ingesting one Act on its own would silently overwrite the first N points of
+    whatever was already indexed. Deriving the id from the document's identity
+    makes ingestion idempotent and safely incremental.
+    """
+    return str(uuid.uuid5(_POINT_NAMESPACE, f"{doc.act}|{doc.section_number}"))
 
 
 class LegalVectorStore:
@@ -64,10 +99,33 @@ class LegalVectorStore:
           },
       )
 
+  async def recreate_collection(self):
+    """Drops and rebuilds the collection, for a full corpus rebuild."""
+    await self.ensure_initialized()
+    await self.client.delete_collection(collection_name=self.collection_name)
+    await self.setup_collection()
+    await self._ensure_act_index()
+
   async def ensure_initialized(self):
     """Ensures that the Qdrant client connection and collection are initialized."""
     if self.client is None:
       await self.setup_collection()
+      await self._ensure_act_index()
+
+  async def _ensure_act_index(self):
+    """Index the `act` payload field so act-scoped retrieval filters efficiently.
+
+    Idempotent: re-creating an existing index is a no-op error we can ignore, so
+    this also upgrades collections that were indexed before scoping existed.
+    """
+    try:
+      await self.client.create_payload_index(
+          collection_name=self.collection_name,
+          field_name="act",
+          field_schema=models.PayloadSchemaType.KEYWORD,
+      )
+    except Exception:
+      pass
 
   async def upsert_legal_documents(
       self, documents: List[LegalSectionDoc], batch_size: int = 100
@@ -85,10 +143,10 @@ class LegalVectorStore:
       sparse_embeddings = list(self.sparse_model.embed(texts))
 
       points = []
-      for offset, (doc, dense_vec, sparse_vec) in enumerate(
-          zip(batch_docs, dense_embeddings, sparse_embeddings)
+      for doc, dense_vec, sparse_vec in zip(
+          batch_docs, dense_embeddings, sparse_embeddings
       ):
-        point_id = i + offset + 1
+        point_id = _point_id(doc)
         points.append(
             models.PointStruct(
                 id=point_id,
@@ -109,12 +167,25 @@ class LegalVectorStore:
       print(f"  [+] Upserted batch {i // batch_size + 1}/{(total_docs + batch_size - 1) // batch_size} ({min(i + batch_size, total_docs)}/{total_docs} docs)...", flush=True)
 
   async def hybrid_search(
-      self, query_text: str, limit: int = 5
+      self, query_text: str, limit: int = 5, acts: Optional[List[str]] = None
   ) -> List[Dict[str, Any]]:
-    """Runs parallel dense & sparse search and merges results via Reciprocal Rank Fusion."""
+    """Runs parallel dense & sparse search and merges results via Reciprocal Rank Fusion.
+
+    `acts` restricts the search to those statutes (see SUBSTANTIVE_ACTS /
+    PROCEDURAL_ACTS). The filter is applied to each prefetch so the restriction
+    shapes candidate generation rather than merely trimming the fused result.
+    """
     await self.ensure_initialized()
     dense_query = list(self.dense_model.embed([query_text]))[0].tolist()
     sparse_query = list(self.sparse_model.embed([query_text]))[0]
+
+    act_filter = (
+        models.Filter(
+            must=[models.FieldCondition(key="act", match=models.MatchAny(any=acts))]
+        )
+        if acts
+        else None
+    )
 
     prefetch = [
         # Sparse BM25 Keyword Search
@@ -125,12 +196,14 @@ class LegalVectorStore:
             ),
             using="sparse",
             limit=20,
+            filter=act_filter,
         ),
         # Dense Semantic Search
         models.Prefetch(
             query=dense_query,
             using="dense",
             limit=20,
+            filter=act_filter,
         ),
     ]
 
@@ -142,7 +215,16 @@ class LegalVectorStore:
         limit=limit,
     )
 
-    return [point.payload for point in response.points]
+    # Carry the fusion score and rank onto the payload: the reranker fallback and
+    # the confidence estimator both need a retrieval signal, and payload-only
+    # returns discarded it.
+    results = []
+    for rank, point in enumerate(response.points):
+        payload = dict(point.payload or {})
+        payload["rrf_score"] = float(point.score) if point.score is not None else None
+        payload["rrf_rank"] = rank
+        results.append(payload)
+    return results
 
 
 vector_store = LegalVectorStore()

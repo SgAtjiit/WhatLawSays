@@ -1,0 +1,40 @@
+MUTUAL NON-DISCLOSURE AGREEMENT
+
+This Mutual Non-Disclosure Agreement is entered into on 20 January 2025 between
+Aravalli Robotics Private Limited, Gurugram (hereinafter "Aravalli") and
+Kaveri Components Private Limited, Coimbatore (hereinafter "Kaveri"), each a
+"Party" and together the "Parties".
+
+1. PURPOSE
+The Parties wish to exchange technical and commercial information in order to
+evaluate a possible supply relationship, and each may disclose such information
+to the other under this Agreement.
+
+2. DEFINITION OF CONFIDENTIAL INFORMATION
+Confidential Information means information disclosed by one Party to the other
+that is marked confidential or that a reasonable person would understand to be
+confidential, but excludes information that is or becomes public, was already
+known to the recipient, or is independently developed.
+
+3. OBLIGATIONS
+Each Party shall use the other's Confidential Information only for the Purpose and
+shall protect it with the same care it applies to its own confidential information,
+and in any event with no less than reasonable care.
+
+4. TERM
+This Agreement shall remain in force for two years from the date above. The
+obligations of confidentiality shall continue for a further period of three years
+after its expiry.
+
+5. RETURN OF INFORMATION
+On expiry or on written request, each Party shall return or destroy the other's
+Confidential Information and confirm in writing that it has done so.
+
+6. DISPUTE RESOLUTION
+Any dispute shall be referred to a sole arbitrator appointed by mutual agreement of
+the Parties, failing which by the Delhi International Arbitration Centre. The seat
+of arbitration shall be New Delhi.
+
+7. GOVERNING LAW
+This Agreement shall be governed by the laws of India and the courts at New Delhi
+shall have jurisdiction.

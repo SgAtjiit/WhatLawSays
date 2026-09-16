@@ -1,0 +1,53 @@
+MASTER SERVICES AGREEMENT
+
+This Master Services Agreement is entered into on 12 February 2025 between
+Helioscope Cloud Services Private Limited, having its registered office at
+Hyderabad (hereinafter "the Provider") and Bluefin Retail Private Limited, having
+its registered office at Chennai (hereinafter "the Client").
+
+1. SERVICES
+The Provider shall make available to the Client the software-as-a-service
+platform described in the applicable Order Form, together with such support
+services as are specified therein.
+
+2. FEES AND PAYMENT
+The Client shall pay the subscription fees set out in the Order Form within
+thirty days of the date of each invoice. Fees are exclusive of applicable taxes.
+
+3. TERM AND RENEWAL
+The initial subscription term is twelve months. This Agreement shall be
+automatically renewed for successive periods of twelve months unless either party
+gives written notice of non-renewal not less than ninety days prior to the end of
+the then current term.
+
+4. MODIFICATION OF TERMS
+The Provider reserves the right to amend these terms at any time at its sole
+discretion by posting the revised terms to its website. Continued use of the
+platform after such posting constitutes acceptance of the revised terms.
+
+5. INDEMNITY
+The Client shall indemnify, defend and hold harmless the Provider against any and
+all claims, losses, damages, liabilities, costs and expenses of whatever nature
+arising out of or in connection with the Client's use of the platform.
+
+6. PERSONAL DATA
+The Client consents to the processing of personal data uploaded to the platform.
+The Provider may share such personal data with its affiliates, sub-processors and
+third party analytics partners for the purpose of improving the platform.
+
+7. ASSIGNMENT
+The Client shall not assign or transfer this Agreement without the prior written
+consent of the Provider. The Provider may assign this Agreement to any affiliate
+or successor entity without restriction and without notice to the Client.
+
+8. LIMITATION OF REMEDIES
+The Client hereby waives all statutory rights and remedies available to it in
+respect of any defect in the platform, to the fullest extent permitted.
+
+9. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by the laws of Singapore and the courts at
+Singapore shall have exclusive jurisdiction over any dispute arising hereunder.
+
+10. TERMINATION
+The Provider may terminate this Agreement at any time without assigning any
+reason by giving thirty days written notice to the Client.

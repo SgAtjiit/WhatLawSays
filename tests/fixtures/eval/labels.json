@@ -1,0 +1,281 @@
+{
+  "_readme": [
+    "Hand-labelled red flags for the evaluation harness (scripts/evaluate_contract_review.py).",
+    "Each entry names the contract, the side it is reviewed from, the rule findings it SHOULD",
+    "produce (by rule_id and clause number), and the checklist protections it SHOULD be",
+    "reported as lacking. Three contracts -- fair_employment_agreement, fair_lease_agreement",
+    "and mutual_nda -- are deliberately clean: every finding on them is a false positive.",
+    "Labels are for the deterministic spine only. Model findings are not scored here, because",
+    "they are not reproducible enough to hold to a fixed answer key."
+  ],
+  "contracts": [
+    {
+      "name": "employment_agreement",
+      "path": "tests/fixtures/employment_agreement.txt",
+      "contract_type": "EMPLOYMENT",
+      "position": "EMPLOYEE",
+      "expected_findings": [
+        {
+          "rule_id": "EMPLOYMENT_BOND",
+          "clause": "4"
+        },
+        {
+          "rule_id": "UNILATERAL_TERMINATION",
+          "clause": "5"
+        },
+        {
+          "rule_id": "PERPETUAL_CONFIDENTIALITY",
+          "clause": "6"
+        },
+        {
+          "rule_id": "BROAD_IP_ASSIGNMENT",
+          "clause": "7"
+        },
+        {
+          "rule_id": "NON_COMPETE_POST_TERM",
+          "clause": "8"
+        },
+        {
+          "rule_id": "UNILATERAL_ARBITRATOR",
+          "clause": "10"
+        }
+      ],
+      "expected_missing": []
+    },
+    {
+      "name": "rental_agreement",
+      "path": "tests/fixtures/rental_agreement.txt",
+      "contract_type": "LEASE",
+      "position": "TENANT",
+      "expected_findings": [
+        {
+          "rule_id": "EXCESSIVE_SECURITY_DEPOSIT",
+          "clause": "3"
+        },
+        {
+          "rule_id": "LOCK_IN_WITHOUT_EXIT",
+          "clause": "4"
+        },
+        {
+          "rule_id": "PENALTY_STIPULATION",
+          "clause": "5"
+        },
+        {
+          "rule_id": "UNILATERAL_TERMINATION",
+          "clause": "6"
+        },
+        {
+          "rule_id": "AUTO_RENEWAL",
+          "clause": "7"
+        },
+        {
+          "rule_id": "UNILATERAL_ARBITRATOR",
+          "clause": "8"
+        },
+        {
+          "rule_id": "OUSTER_OF_LEGAL_REMEDY",
+          "clause": "8"
+        }
+      ],
+      "expected_missing": [
+        "MAINTENANCE"
+      ]
+    },
+    {
+      "name": "saas_services_agreement",
+      "path": "tests/fixtures/saas_services_agreement.txt",
+      "contract_type": "SAAS",
+      "position": "CLIENT",
+      "expected_findings": [
+        {
+          "rule_id": "AUTO_RENEWAL",
+          "clause": "3"
+        },
+        {
+          "rule_id": "UNILATERAL_AMENDMENT",
+          "clause": "4"
+        },
+        {
+          "rule_id": "UNCAPPED_INDEMNITY",
+          "clause": "5"
+        },
+        {
+          "rule_id": "DATA_SHARING_WITHOUT_CONSENT",
+          "clause": "6"
+        },
+        {
+          "rule_id": "ONE_SIDED_ASSIGNMENT",
+          "clause": "7"
+        },
+        {
+          "rule_id": "UNFAIR_TERM_WAIVER",
+          "clause": "8"
+        },
+        {
+          "rule_id": "FOREIGN_EXCLUSIVE_JURISDICTION",
+          "clause": "9"
+        },
+        {
+          "rule_id": "UNILATERAL_TERMINATION",
+          "clause": "10"
+        }
+      ],
+      "expected_missing": [
+        "CONFIDENTIALITY",
+        "LIABILITY"
+      ]
+    },
+    {
+      "name": "fair_employment_agreement",
+      "path": "tests/fixtures/eval/fair_employment_agreement.txt",
+      "contract_type": "EMPLOYMENT",
+      "position": "EMPLOYEE",
+      "expected_findings": [],
+      "expected_missing": [],
+      "clean": true
+    },
+    {
+      "name": "fair_lease_agreement",
+      "path": "tests/fixtures/eval/fair_lease_agreement.txt",
+      "contract_type": "LEASE",
+      "position": "TENANT",
+      "expected_findings": [],
+      "expected_missing": [],
+      "clean": true
+    },
+    {
+      "name": "mutual_nda",
+      "path": "tests/fixtures/eval/mutual_nda.txt",
+      "contract_type": "NDA",
+      "position": "RECEIVING_PARTY",
+      "expected_findings": [],
+      "expected_missing": [],
+      "clean": true
+    },
+    {
+      "name": "one_sided_nda",
+      "path": "tests/fixtures/eval/one_sided_nda.txt",
+      "contract_type": "NDA",
+      "position": "RECEIVING_PARTY",
+      "expected_findings": [
+        {
+          "rule_id": "PERPETUAL_CONFIDENTIALITY",
+          "clause": "2"
+        },
+        {
+          "rule_id": "NON_COMPETE_POST_TERM",
+          "clause": "3"
+        },
+        {
+          "rule_id": "PENALTY_STIPULATION",
+          "clause": "4"
+        },
+        {
+          "rule_id": "UNILATERAL_AMENDMENT",
+          "clause": "5"
+        },
+        {
+          "rule_id": "FOREIGN_EXCLUSIVE_JURISDICTION",
+          "clause": "6"
+        }
+      ],
+      "expected_missing": [
+        "TERM"
+      ]
+    },
+    {
+      "name": "freelance_agreement",
+      "path": "tests/fixtures/eval/freelance_agreement.txt",
+      "contract_type": "FREELANCE",
+      "position": "SERVICE_PROVIDER",
+      "expected_findings": [
+        {
+          "rule_id": "BROAD_IP_ASSIGNMENT",
+          "clause": "3"
+        },
+        {
+          "rule_id": "UNILATERAL_TERMINATION",
+          "clause": "4"
+        },
+        {
+          "rule_id": "PENALTY_STIPULATION",
+          "clause": "5"
+        },
+        {
+          "rule_id": "UNCAPPED_INDEMNITY",
+          "clause": "6"
+        },
+        {
+          "rule_id": "NON_COMPETE_POST_TERM",
+          "clause": "7"
+        }
+      ],
+      "expected_missing": [
+        "LIABILITY",
+        "CONFIDENTIALITY"
+      ]
+    },
+    {
+      "name": "personal_loan_agreement",
+      "path": "tests/fixtures/eval/personal_loan_agreement.txt",
+      "contract_type": "LOAN",
+      "position": "BORROWER",
+      "expected_findings": [
+        {
+          "rule_id": "UNILATERAL_AMENDMENT",
+          "clause": "2"
+        },
+        {
+          "rule_id": "PENALTY_STIPULATION",
+          "clause": "4"
+        },
+        {
+          "rule_id": "UNILATERAL_ARBITRATOR",
+          "clause": "5"
+        },
+        {
+          "rule_id": "OUSTER_OF_LEGAL_REMEDY",
+          "clause": "6"
+        },
+        {
+          "rule_id": "UNFAIR_TERM_WAIVER",
+          "clause": "6"
+        }
+      ],
+      "expected_missing": [
+        "TERM",
+        "TERMINATION"
+      ]
+    },
+    {
+      "name": "vendor_supply_agreement",
+      "path": "tests/fixtures/eval/vendor_supply_agreement.txt",
+      "contract_type": "VENDOR",
+      "position": "SERVICE_PROVIDER",
+      "expected_findings": [
+        {
+          "rule_id": "AUTO_RENEWAL",
+          "clause": "3"
+        },
+        {
+          "rule_id": "ONE_SIDED_ASSIGNMENT",
+          "clause": "4"
+        },
+        {
+          "rule_id": "UNILATERAL_TERMINATION",
+          "clause": "5"
+        },
+        {
+          "rule_id": "UNILATERAL_AMENDMENT",
+          "clause": "6"
+        }
+      ],
+      "expected_missing": [
+        "CONFIDENTIALITY",
+        "DATA_PROTECTION",
+        "FORCE_MAJEURE",
+        "LIABILITY"
+      ]
+    }
+  ]
+}

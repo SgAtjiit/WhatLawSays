@@ -1,6 +1,7 @@
 from langchain_groq import ChatGroq
 from src.agents.state import GraphState
 from src.config import settings
+from src.core.confidence import estimate_absence_confidence
 from src.core.logger import pipeline_logger
 from src.schemas.legal import ExtractedFacts
 
@@ -13,6 +14,8 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
         f"Processing scenario text for Task [{state.get('task_id', 'local')}] -> Extracting Explicit Facts & Unknowns",
         details=scenario[:120] + "...",
     )
+
+    llm_available = True
 
     try:
         llm = ChatGroq(
@@ -50,6 +53,7 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
             f"Groq API Info ({type(e).__name__}). Using Rule-Based Immutable Fact Extractor Engine.",
             status="WARNING",
         )
+        llm_available = False
         s_lower = scenario.lower()
 
         if len(scenario.strip().split()) < 3 and not any(k in s_lower for k in ["theft", "stole", "police", "arrest", "hit", "kill", "fight", "rob", "cheat", "enter", "party"]):
@@ -110,6 +114,14 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
             )
 
     if facts.should_early_exit:
+        # Nothing was retrieved and no offence was analysed, so the absence
+        # estimator scores this on retrieval (zero) and fact completeness alone.
+        _, early_exit_report = estimate_absence_confidence(
+            retrieved_chunks=[],
+            has_contradiction=False,
+            unknown_facts=facts.unknown_facts,
+            llm_available=llm_available,
+        )
         pipeline_logger.log_step(
             "AGENT 1: FACT EXTRACTOR",
             "Vacuous input detected -> Triggering EARLY EXIT.",
@@ -124,11 +136,14 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
             "scenario_domain": facts.scenario_domain,
             "offense_status": "UNDETERMINED",
             "verification_passed": False,
+            "llm_available": llm_available,
+            "confidence_basis": early_exit_report.to_payload(),
             "final_response": {
                 "status": "NEEDS_CLARIFICATION",
                 "scenario_domain": facts.scenario_domain,
                 "offense_status": "UNDETERMINED",
-                "confidence_score": 0.30,
+                "confidence_score": early_exit_report.score,
+                "confidence_basis": early_exit_report.to_payload(),
                 "extracted_facts": facts.model_dump(),
                 "identified_offenses": [],
                 "clarification_questions": facts.unknown_facts or ["Please describe the scenario or event that took place."],
@@ -157,4 +172,5 @@ async def run_fact_extractor(state: GraphState) -> GraphState:
         "unknown_facts": facts.unknown_facts,
         "scenario_domain": facts.scenario_domain,
         "offense_status": facts.offense_status,
+        "llm_available": llm_available,
     }

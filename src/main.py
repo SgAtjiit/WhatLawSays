@@ -4,6 +4,7 @@ from typing import Dict
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from src.agents.graph import legal_agent_app
+from src.api.v1.router import api_router
 from src.config import settings
 from src.core.database import init_db
 from src.core.vector_store import vector_store
@@ -26,6 +27,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Contract review lives in the v1 router. Until now nothing mounted that router,
+# so every endpoint defined under src/api/v1/endpoints was unreachable.
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Simple Rate Limiter state tracking per client IP
 RATE_LIMIT_STORE: Dict[str, list] = {}
@@ -107,11 +112,16 @@ async def analyze_scenario(payload: ScenarioRequest, request: Request):
             "extracted_facts": None,
             "candidate_chunks": [],
             "retrieved_chunks": [],
+            "candidate_procedural_chunks": [],
+            "procedural_chunks": [],
             "draft_offenses": [],
             "verification_passed": False,
             "verification_feedback": None,
             "retry_count": 0,
+            "llm_available": True,
+            "reranker_available": True,
             "confidence_score": None,
+            "confidence_basis": None,
             "final_response": None,
         }
 
@@ -138,6 +148,9 @@ async def analyze_scenario(payload: ScenarioRequest, request: Request):
             details={
                 "status": result_payload.get("status"),
                 "confidence_score": result_payload.get("confidence_score"),
+                "confidence_caps": (result_payload.get("confidence_basis") or {}).get(
+                    "caps_applied", []
+                ),
                 "offenses_count": len(result_payload.get("identified_offenses", [])),
             },
             status="SUCCESS",
