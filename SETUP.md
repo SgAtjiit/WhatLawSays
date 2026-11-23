@@ -3,6 +3,17 @@
 Verified end-to-end on macOS (Darwin 25.3.0, Apple Silicon) on 2026-09-11.
 This supplements `README.md`, which is accurate in outline but has a few gaps noted below.
 
+**Layout (2026-11-23).** The backend lives in `backend/` and the React frontend in
+`frontend/`. Run every `uv` command from `backend/` and every `npm` command from
+`frontend/`. The Streamlit UI has been replaced; see section 8.
+
+**Demo.** With uv, Node and Docker installed (sections 1 and 4), `./demo.sh` from the repository root
+starts the Auth emulator, the backend on port 8010 and the app on 5173, with two
+seeded demo accounts. It needs no Firebase project and no Groq key. See `DEMO.md`.
+The demo accounts exist only in the emulator; the app offers them only when
+built with `--mode demo` against the emulator, and a production build leaves
+them out entirely.
+
 ---
 
 ## 0. What actually has to be true
@@ -38,7 +49,7 @@ The `.venv` shipped in the working tree was Python 3.9 (pip-created) and cannot 
 `requires-python = ">=3.13"`. Remove it and let uv rebuild:
 
 ```bash
-cd /Users/abcom/Desktop/WhatLawSays
+cd backend
 rm -rf .venv
 uv sync
 uv run python -c "import sys; print(sys.version)"   # expect 3.13.x
@@ -96,18 +107,16 @@ psql -h 127.0.0.1 -U "$USER" -d postgres -c "CREATE DATABASE whatlawsays;"
 **(b) Use the container** — remap it in `docker-compose.yml` to `"5433:5432"` and set
 `DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5433/whatlawsays"`.
 
-## 5. Configure `.env`
+## 5. Configure `backend/.env`
 
 ```bash
-cat > .env <<'EOF'
-PROJECT_NAME="WhatLawSays Backend"
-API_V1_STR="/api/v1"
-GROQ_MODEL="openai/gpt-oss-120b"
-QDRANT_URL="http://localhost:6333"
-REDIS_URL="redis://localhost:6379/0"
-DATABASE_URL="postgresql+asyncpg://abcom@127.0.0.1:5432/whatlawsays"
-EOF
+cd backend
+cp .env.example .env    # then set GROQ_API_KEY, FIREBASE_PROJECT_ID and DATABASE_URL
 ```
+
+`src/config.py` is committed and holds no secrets: every value is read from the
+environment or `backend/.env`, which stays gitignored. Keep keys in `.env`, never in
+`config.py`.
 
 ### The model default is dead
 
@@ -120,23 +129,9 @@ curl -s https://api.groq.com/openai/v1/models \
   -H "Authorization: Bearer $GROQ_API_KEY" | python3 -m json.tool | grep '"id"'
 ```
 
-`GROQ_API_KEY` is not in `.env` above because `src/config.py` carries a working default.
-Note that `src/config.py` is **gitignored** (the bare `config.py` pattern in `.gitignore`
-catches it), so a fresh clone has no config at all and the app will not import — set
-`GROQ_API_KEY` in `.env` in that case.
-
-If you recreate `src/config.py`, the contract-review pipeline also needs these fields on
-`Settings` (values are the measured defaults; see the comments in the file for why):
-
-```python
-CONTRACT_LLM_CONCURRENCY: int = 4     # 12 concurrent succeed, 40 rate-limit 45%
-CONTRACT_LLM_CALL_BUDGET: int = 40    # worst case is ~30 calls; room for retries
-CONTRACT_HOT_BATCH: int = 4
-CONTRACT_WARM_BATCH: int = 10
-CONTRACT_CLASSIFY_BATCH: int = 12
-```
-
-Without them `settings.CONTRACT_LLM_CONCURRENCY` raises and every contract review fails.
+`src/config.py` used to be gitignored, so a fresh clone could not import the app at all.
+It is now committed, with the measured contract-review defaults
+(`CONTRACT_LLM_CONCURRENCY=4`, `CONTRACT_LLM_CALL_BUDGET=40` and the batch sizes).
 
 ## 6. Seed the legal corpus
 
@@ -160,9 +155,12 @@ curl -s http://localhost:6333/collections/whatlawsays_legal_corpus \
 ## 7. Run it (two terminals)
 
 ```bash
-uv run uvicorn src.main:app --reload --port 8000   # API + docs at /docs
-uv run streamlit run frontend/app.py               # UI at :8501, defaults to the :8000 backend
+cd backend && uv run uvicorn src.main:app --reload --port 8000   # API + docs at /docs
+cd frontend && npm ci && npm run dev                             # UI at :5173, proxies to :8000
 ```
+
+If port 8000 is taken (a local DynamoDB often is), run the API on another port and tell
+Vite where it is: `BACKEND_URL=http://127.0.0.1:8010 npm run dev`.
 
 > With embedded Qdrant (no Docker), `./qdrant_db` is locked by a single process — ingest and the
 > API cannot run at once, and `--reload` can trip over it. Run Qdrant in Docker to avoid this.
@@ -214,7 +212,8 @@ psql -h 127.0.0.1 -U "$USER" -d whatlawsays -c \
 Tests:
 
 ```bash
-uv run pytest tests/     # 3 passed
+cd backend && uv run pytest              # backend
+cd frontend && npm test && npm run e2e   # frontend unit and end-to-end
 ```
 
 ### Reading the pipeline log
@@ -279,15 +278,16 @@ docker compose down          # add -v to drop volumes
 Start the API, the worker, and the UI:
 
 ```bash
-uv run uvicorn src.main:app --reload            # API, including /api/v1/contracts
-uv run python -m scripts.contract_worker        # consumes queued reviews
-uv run streamlit run frontend/app.py            # multipage UI
+cd backend && uv run uvicorn src.main:app --reload     # API, including /api/v1/contracts
+cd backend && uv run python -m scripts.contract_worker # consumes queued reviews
+cd frontend && npm run dev                             # the React app
 ```
 
 Review a contract from the shell:
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/contracts \
+  -H "Authorization: Bearer $ID_TOKEN" \
   -F "file=@my-offer-letter.pdf" \
   -F "contract_type=EMPLOYMENT" -F "position=EMPLOYEE"
 ```
@@ -302,3 +302,62 @@ still moves the right way when a review is degraded:
 uv run python -m scripts.evaluate_contract_review --verbose
 uv run python -m scripts.calibrate_confidence --verbose
 ```
+
+
+---
+
+## 8. Sign-in (Firebase) and the React frontend
+
+### Firebase project
+
+1. In the Firebase console, create a project (or pick one).
+2. **Authentication → Sign-in method**: enable **Google** and **Email/Password**.
+3. **Authentication → Settings → Authorized domains**: add your production domain.
+   `localhost` is there already.
+4. **Project settings → Your apps**: register a **Web app** and copy its config.
+5. Put the config in `frontend/.env.local` (copy `frontend/.env.example`), and the
+   project id in `backend/.env` as `FIREBASE_PROJECT_ID`.
+
+The backend checks ID tokens against Google's public keys using only the project id;
+it needs no service-account key. The web config is not secret, but it stays out of git.
+
+### Without a Firebase project: the Auth emulator
+
+```bash
+cd frontend && npm run emulator                                   # :9099, no Java needed
+cd backend && FIREBASE_PROJECT_ID=demo-whatlawsays \
+  FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 uv run uvicorn src.main:app --port 8010
+cd frontend && npm run dev:emulator                               # uses .env.emulator
+```
+
+Verification emails are not sent by the emulator. Confirm an address by opening the
+link it records:
+
+```bash
+curl -s http://127.0.0.1:9099/emulator/v1/projects/demo-whatlawsays/oobCodes
+```
+
+### Tests
+
+```bash
+cd frontend
+npm run lint
+npm test        # Vitest
+npm run e2e     # Playwright against the emulator, using your installed Chrome
+```
+
+### Production
+
+`docker compose up --build` builds one image: the React app is built in a Node stage and
+served by FastAPI from the same origin as the API. Set the `VITE_FIREBASE_*` variables
+in the shell or a root `.env` before building.
+
+A contract review is a single request that can run for a couple of minutes. Any reverse
+proxy in front of the API needs a read timeout of at least 600 seconds, or long reviews
+are cut off.
+
+Talk it through streams its answers as server-sent events
+(`POST /api/v1/conversations/{id}/messages`). The proxy must pass the response through
+unbuffered:
+- **nginx:** honours the `X-Accel-Buffering: no` header the API sends; otherwise set `proxy_buffering off` for `/api/`.
+- **Other proxies:** turn response buffering off, or the answer arrives in one piece at the end.

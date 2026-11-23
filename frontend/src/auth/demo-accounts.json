@@ -1,0 +1,58 @@
+{
+  "$comment": "Demo mode only (./demo.sh). These accounts exist only in the local Firebase Auth emulator; the password is public by design and is refused anywhere else. backend/scripts/seed_demo.py creates them and runs each review below, oldest first, so the first one in each list is the newest in My reviews. A `conversation` is replayed into Talk it through only when a Groq key is set: without the model a saved reply would be the fallback.",
+  "password": "whatlawsays-demo",
+  "accounts": [
+    {
+      "id": "priya",
+      "uid": "demo-priya",
+      "name": "Priya Sharma",
+      "email": "priya@example.com",
+      "blurb": "Four reviews ready: a loaded job offer, a flat lease, a scanned copy, and a fair contract.",
+      "reviews": [
+        {
+          "file": "01_employment_loaded.pdf",
+          "contract_type": "EMPLOYMENT",
+          "position": "EMPLOYEE"
+        },
+        {
+          "file": "02_rental_table_terms.docx",
+          "contract_type": "LEASE",
+          "position": "TENANT"
+        },
+        {
+          "file": "09_scanned_employment.pdf",
+          "contract_type": "EMPLOYMENT",
+          "position": "EMPLOYEE"
+        },
+        {
+          "file": "04_employment_fair.pdf",
+          "contract_type": "EMPLOYMENT",
+          "position": "EMPLOYEE"
+        }
+      ],
+      "conversation": [
+        "Someone posted private photos of me online without my consent.",
+        "They were photos I had sent privately to my ex. Does that change anything?"
+      ]
+    },
+    {
+      "id": "arjun",
+      "uid": "demo-arjun",
+      "name": "Arjun Mehta",
+      "email": "arjun@example.com",
+      "blurb": "A loan and a freelance contract. Switch to him to show Priya's reviews stay private.",
+      "reviews": [
+        {
+          "file": "08_loan_agreement.docx",
+          "contract_type": "LOAN",
+          "position": "BORROWER"
+        },
+        {
+          "file": "03_freelance_contract.txt",
+          "contract_type": "FREELANCE",
+          "position": "SERVICE_PROVIDER"
+        }
+      ]
+    }
+  ]
+}

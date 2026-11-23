@@ -1,10 +1,19 @@
-version: '3.8'
-
 services:
   api:
-    build: .
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      # Read from the shell or a root .env file. Leave unset to build without sign-in.
+      args:
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_AUTH_DOMAIN: ${VITE_FIREBASE_AUTH_DOMAIN:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
     ports:
       - "8000:8000"
+    env_file:
+      - path: backend/.env
+        required: false
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/whatlawsays
       - QDRANT_URL=http://qdrant:6333

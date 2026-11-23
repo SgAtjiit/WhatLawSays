@@ -1,0 +1,78 @@
+/*
+ * WhatLawSays design tokens. Components use these and nothing else.
+ *
+ * The rule the whole identity rests on: serif is the source's own words
+ * (a contract, a statute, the facts as told); sans is our voice.
+ */
+:root {
+  /* Surfaces */
+  --paper: #f4f5f7;
+  --sheet: #ffffff;
+  --sheet-sunk: #fafbfc;
+
+  /* Text */
+  --ink: #12141a;
+  --graphite: #555b69;
+  --faint: #6b7180;
+
+  /* Lines */
+  --rule: #d9dce2;
+  --rule-strong: #b9bec8;
+
+  /* The one accent: court-seal ink. */
+  --seal: #1f3a93;
+  --seal-strong: #172d75;
+  --seal-tint: #eef1fa;
+  --seal-tint-strong: #e2e7f6;
+
+  /* Highlighter for quoted passages. */
+  --marker: #ffe68a;
+  --marker-soft: #fff4c4;
+
+  /* Severity: always paired with a text label, never colour alone. */
+  --critical: #b42318;
+  --critical-tint: #fef3f2;
+  --high: #c2410c;
+  --high-tint: #fff4ed;
+  --medium: #9a5b00;
+  --medium-tint: #fff8e6;
+  --low: #3f6212;
+  --low-tint: #f3f8ec;
+  --info: #4a5565;
+  --info-tint: #f2f4f7;
+
+  --ok: #1d6b45;
+  --ok-tint: #edf7f1;
+
+  /* Shape */
+  --radius: 6px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-quick: 150ms;
+  --duration-base: 200ms;
+
+  /* Layout */
+  --measure: 68ch;
+  --header-h: 56px;
+
+  /* shadcn/ui names, pointed at the tokens above. */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--sheet);
+  --card-foreground: var(--ink);
+  --popover: var(--sheet);
+  --popover-foreground: var(--ink);
+  --primary: var(--seal);
+  --primary-foreground: #ffffff;
+  --secondary: var(--sheet);
+  --secondary-foreground: var(--ink);
+  --muted: var(--sheet-sunk);
+  --muted-foreground: var(--graphite);
+  --accent: var(--seal-tint);
+  --accent-foreground: var(--seal-strong);
+  --destructive: var(--critical);
+  --border: var(--rule);
+  --input: var(--rule-strong);
+  --ring: var(--seal);
+}

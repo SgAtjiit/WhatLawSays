@@ -5,7 +5,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.42+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/docs/auth)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Multi--Agent-FF6F00?style=for-the-badge&logo=langchain&logoColor=white)](https://www.langchain.com/langgraph)
 [![Qdrant](https://img.shields.io/badge/Qdrant-Hybrid--Vector--DB-DC2626?style=for-the-badge&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 [![Groq](https://img.shields.io/badge/Groq-Llama3.3%20%2F%20GPT--OSS-f55036?style=for-the-badge&logo=groq&logoColor=white)](https://groq.com/)
@@ -65,14 +66,26 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 
 ## 📂 Project Structure
 
+The backend and the frontend each live in their own folder.
+
 ```text
-├── frontend/
-│   ├── app.py                   # Streamlit Interactive Web Application
-│   ├── components.py            # Streamlit UI Components, Styling & Cards
-│   └── sample_scenarios.py      # Predefined Legal Test Scenarios
-├── src/
+├── frontend/                    # React app (Vite, plain JavaScript, Tailwind, shadcn/ui)
+│   ├── src/
+│   │   ├── api/                 # The one HTTP client, response schemas (Zod), endpoints
+│   │   ├── auth/                # Firebase sign-in, session guard, error messages
+│   │   ├── routes/              # Home, sign-in screens, Scenario, contract upload/review, My reviews
+│   │   ├── features/contract/   # Document view with margin notes, finding notes, Ask sheet
+│   │   ├── components/          # App shell, shared states, shadcn/ui primitives
+│   │   └── styles/tokens.css    # Design tokens: every colour, size and motion value
+│   └── tests/                   # Vitest unit tests, Playwright end-to-end, recorded fixtures
+├── backend/
+│   ├── Dockerfile               # Builds the frontend, then serves it and the API together
+│   ├── pyproject.toml, uv.lock  # Python dependencies
+│   ├── data/                    # Statute text, one JSON file per Act
+│   ├── samples/                 # Sample contracts for trying the review by hand
+├── backend/src/
 │   ├── main.py                  # FastAPI Application Gateway & Middleware
-│   ├── config.py                # Pydantic Settings & Environment Configurations
+│   ├── config.py                # Settings, read from the environment and backend/.env
 │   ├── agents/
 │   │   ├── graph.py             # LangGraph Multi-Agent Workflow Definition
 │   │   ├── state.py             # TypedDict GraphState Engine Representation
@@ -104,25 +117,53 @@ Unlike basic RAG chatbots that perform naive similarity searches and generate un
 │   │   ├── confidence.py        # Multi-Component Confidence Estimator
 │   │   ├── task_queue.py        # Redis Async Task Queue Producer/Consumer
 │   │   ├── database.py          # SQLAlchemy PostgreSQL Async Models & Operations
+│   │   ├── auth.py              # Firebase ID-token verification (require_user)
 │   │   └── logger.py            # Colorized Pipeline Stage Logging Engine
 │   └── schemas/
 │       ├── contract.py          # Contract review schemas: clauses, findings, party sides
 │       ├── contract_review.py   # Model-facing payloads & the review response envelope
 │       ├── legal.py             # Pydantic Schemas for Requests, Offenses, Actions & Duties
 │       └── corpus.py            # Legal Section Data Schemas
-├── scripts/
+├── backend/scripts/
 │   ├── ingest_legal_corpus.py   # Seed Data Ingestion Script (Batch & Async Setup)
 │   ├── fetch_indiacode_act.py   # Fetches an Act's sections verbatim from India Code
 │   ├── find_indiacode_act.py    # Looks up an Act's India Code act_id by name
 │   ├── test_pipeline.py         # End-to-End Pipeline Integration Test
 │   ├── test_hybrid_search.py   # Hybrid Vector Search Verification Script
 │   └── test_president_invitation.py # Test Script for Undetermined Scenario
-├── tests/
-│   └── test_agents.py           # Pytest Suite for Agents & Workflows
-├── docker-compose.yml           # Multi-Container Deployment (FastAPI, Redis, Qdrant)
-├── pyproject.toml               # Dependencies & UV Project Configuration
+├── backend/tests/               # Pytest suite
+├── docker-compose.yml           # API + Postgres + Qdrant + Redis
+├── SETUP.md                     # Step-by-step local setup
 └── README.md                    # System Documentation
 ```
+
+---
+
+## 💬 Talk it through (Legal companion)
+
+A conversation about the reader's own situation, where every answer rests on statute
+text. One turn (`backend/src/core/legal_chat.py`):
+
+1. **Rewrite** the latest message into a standalone search, using the conversation. "What if he was drunk?" means nothing to a search engine on its own.
+2. **Translate** everyday words into the statutes' own: "FIR" → *information in cognizable cases*, "landlord" → *lessor*.
+3. **Search** all three pools of Acts (penal, procedural, civil) and rerank them with the cross-encoder. The top 8 sections are numbered [1]–[8].
+4. **Stream** an answer that may rely only on those sections and cites them as [n]. Any [n] the model wasn't shown is dropped before the answer is saved.
+5. **Admit weak matches.** When no section matches well, which happens for labour, family or tax questions outside the twelve Acts, the model is told so and the reply says the question isn't covered.
+
+Without a Groq key it still searches. It shows the sections unsummarised and says plainly
+that it can't write an answer.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/v1/conversations` | Your conversations, most recently active first |
+| `POST /api/v1/conversations` | Start one |
+| `GET /api/v1/conversations/{id}` | Its messages, each with the sections it was given and which it cites |
+| `PATCH` / `DELETE /api/v1/conversations/{id}` | Rename, delete (removes every message) |
+| `POST /api/v1/conversations/{id}/messages` | Send a message; the reply streams as server-sent events: `sources`, `delta`…, `done` or `error` |
+
+Every route needs sign-in. Someone else's conversation returns 404, exactly like a
+missing one. A reply is saved only once it is complete, so a stopped or failed answer
+leaves nothing half-written. The app is at `/talk`.
 
 ---
 
@@ -183,11 +224,21 @@ unknown reviewing side at `0.65`, a degraded LLM at `0.60`.
 |---|---|---|
 | `POST` | `/api/v1/contracts` | Upload and review synchronously |
 | `POST` | `/api/v1/contracts/async` | Enqueue a review, returns a `contract_id` to poll |
+| `GET` | `/api/v1/contracts` | The signed-in user's reviews, newest first (`limit`, `offset`) |
 | `GET` | `/api/v1/contracts/{id}` | Fetch a stored review, or its status while queued |
+| `GET` | `/api/v1/contracts/{id}/document` | The text the review ran on; every offset indexes into it |
 | `DELETE` | `/api/v1/contracts/{id}` | Delete the contract and its review |
 | `GET` | `/api/v1/contracts/meta/supported` | Accepted formats, types, and the sides of each |
 
-Uploads are capped at 15 MB and 200 pages, limited to 6 per minute per IP, and sniffed
+**Sign-in.** Every route except `/health` and `/contracts/meta/supported` needs a
+Firebase ID token as `Authorization: Bearer <token>`, and so does `POST /api/v1/analyze`.
+Email and password accounts must have confirmed their address (403 otherwise). Each
+contract belongs to the account that uploaded it: someone else's contract answers 404,
+exactly like one that does not exist, so ids cannot be probed. Contracts stored before
+sign-in existed have no owner and are reachable by nobody. The server verifies tokens
+with the project id alone and holds no Firebase secret.
+
+Uploads are capped at 15 MB and 200 pages, limited to 6 per minute per user, and sniffed
 by extension before the browser's declared type. A review is roughly thirty LLM calls
 against one shared key, which is why the ceiling is far below the scenario endpoint's.
 
@@ -271,42 +322,59 @@ which the measurement puts within 0.05 of observed quality.
 
 ### Frontend
 
-Streamlit multipage. `frontend/app.py` is the entrypoint; the two workbenches are
-`frontend/pages/`. The contract page shows red flags, a clause-by-clause read, the
-missing protections, consistency conflicts, the document with every finding highlighted
-in place, and the full confidence basis.
+A React app in `frontend/`: Vite, plain JavaScript, Tailwind CSS v4 and shadcn/ui, with
+Firebase for sign-in (Google, or email and password with a confirmed address).
+
+The design rests on one rule: **serif type is the source's own words** (your contract,
+a statute, the facts as you told them), and sans-serif is the product's voice. The
+contract review sets the document as a page with every finding highlighted where it
+occurs and its note pinned in the margin beside it, which is possible only because each
+finding records offsets into the exact text the review ran on.
+
+- **Scenario Analysis**: the verdict, the facts separated, each offence with its element
+  audit, procedure, and what to do now.
+- **Contract review**: overview, red flags, what to ask for, clause by clause, what's
+  missing, consistency, confidence, the annotated document, and an "Ask the contract"
+  panel. Reviews live at their own address, so they survive a reload.
+- **My reviews**: every review the account has made, to reopen, download as PDF or delete.
+
+Every response is checked against a schema when it arrives (`src/api/schemas.js`), so a
+backend change fails loudly with the field's name rather than rendering as a blank.
 
 ---
 
 ## ⚡ Quick Start & Installation
 
-### Prerequisites
-- **Python 3.13+**
-- **Docker & Docker Compose** (for Qdrant & Redis)
-- **uv** package manager (`pip install uv`)
+**Just want to see it?** `./demo.sh` starts everything locally with two demo
+accounts whose reviews are already done: one click to sign in, no Firebase
+project or API key needed. The walkthrough is in [DEMO.md](DEMO.md).
 
-### 1. Clone Repository & Install Dependencies
+[SETUP.md](SETUP.md) walks through every step on macOS. In short:
+
+### Prerequisites
+- **Python 3.13+** and **uv**
+- **Node.js 20.19+** (22 or 24 recommended)
+- **Docker** (Postgres, Qdrant, Redis)
+- **tesseract**, to review scans and photographs (`brew install tesseract`)
+- A **Firebase project** with the Google and Email/Password sign-in providers enabled
+
+### 1. Backend
 ```bash
-git clone https://github.com/your-username/whatLawSays.git
-cd whatLawSays
+cd backend
 uv sync
+cp .env.example .env            # then fill in GROQ_API_KEY and FIREBASE_PROJECT_ID
 ```
 
-### 2. Environment Configuration
-Create a `.env` file in the root directory:
-```env
-PROJECT_NAME="WhatLawSays Backend"
-API_V1_STR="/api/v1"
-GROQ_API_KEY="gsk_your_groq_api_key_here"
-GROQ_MODEL="openai/gpt-oss-120b"
-QDRANT_URL="http://localhost:6333"
-REDIS_URL="redis://localhost:6379/0"
-DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/whatlawsays"
+### 2. Frontend
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local      # then fill in your Firebase web app's config
 ```
 
 ### 3. Launch Services with Docker Compose
 ```bash
-docker-compose up -d
+docker compose up -d postgres qdrant redis
 ```
 
 ### Legal corpus
@@ -341,7 +409,7 @@ legislative repository, via its DSpace REST API. Section text is copied verbatim
 never paraphrased. To refresh or add an Act, find its `act_id` and harvest it:
 
 ```bash
-uv run python scripts/find_indiacode_act.py "Indian Contract Act"
+cd backend && uv run python scripts/find_indiacode_act.py "Indian Contract Act"
 uv run python scripts/fetch_indiacode_act.py <act_id> "<Short Tag>" data/<file>.json
 ```
 
@@ -356,38 +424,65 @@ unset rather than inferred.
 
 ### 4. Seed Legal Corpus into Qdrant
 ```bash
-uv run python -m scripts.ingest_legal_corpus
+cd backend && uv run python -m scripts.ingest_legal_corpus
 ```
 
-### 5. Run FastAPI Application Server
+### 5. Run the backend
 ```bash
-uv run uvicorn src.main:app --reload --port 8000
+cd backend && uv run uvicorn src.main:app --reload --port 8000
 ```
-Interactive API Documentation will be available at: **`http://localhost:8000/docs`**
+API documentation: **`http://localhost:8000/docs`**
 
-### 6. Run Interactive Streamlit Frontend UI
+### 6. Run the frontend
 ```bash
-uv run streamlit run frontend/app.py
+cd frontend && npm run dev
 ```
-Interactive Web Workbench will open at: **`http://localhost:8501`**
+The app opens at **`http://localhost:5173`**. Vite forwards `/api` and `/health` to the
+backend (`BACKEND_URL`, default `http://localhost:8000`), so the browser only ever talks to
+one origin.
+
+To work without a Firebase project, use the local Auth emulator:
+```bash
+cd frontend && npm run emulator        # terminal 1
+cd backend && FIREBASE_PROJECT_ID=demo-whatlawsays FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
+  uv run uvicorn src.main:app --port 8010   # terminal 2
+cd frontend && npm run dev:emulator    # terminal 3
+```
+
+### Production
+`docker compose up --build` builds one image that serves the API and the React app from
+the same origin on port 8000. Pass the Firebase web config as `VITE_FIREBASE_*`
+variables at build time, and `FIREBASE_PROJECT_ID` in `backend/.env`.
 
 ---
 
 ## 🧪 Testing & Verification
 
-Run the automated agent pytest suite:
+Backend:
 ```bash
-uv run pytest tests/
+cd backend && uv run pytest
 ```
+
+Frontend:
+```bash
+cd frontend
+npm run lint
+npm test          # Vitest: document offsets, API errors, response shapes
+npm run e2e       # Playwright: sign-in flows on the Auth emulator, every screen, phone width
+```
+
+The end-to-end suite serves the API from responses recorded from the real backend
+(`frontend/tests/fixtures`), and `backend/tests/test_frontend_fixtures.py` checks those
+recordings against the backend's own response models, so the two cannot drift apart.
 
 Run the hybrid search verification script:
 ```bash
-uv run python -m scripts.test_hybrid_search
+cd backend && uv run python -m scripts.test_hybrid_search
 ```
 
 Run the President's Residence Invitation integration test:
 ```bash
-uv run python -m scripts.test_president_invitation
+cd backend && uv run python -m scripts.test_president_invitation
 ```
 
 ---
