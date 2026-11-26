@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AnswerText } from "@/features/companion/AnswerText";
 import { ConversationList, UNTITLED } from "@/features/companion/ConversationList";
 import { SourceList } from "@/features/companion/Sources";
+import { ThinkingProcess } from "@/features/companion/ThinkingProcess";
 import { situationFrom } from "@/lib/answerText";
 import { NotFound } from "@/routes/NotFound";
 
@@ -73,7 +74,12 @@ function AssistantMessage({ message, activeN, onCite, streaming }) {
     <div className="max-w-measure">
       <span className="sr-only">WhatLawSays said: </span>
       <AnswerText text={message.content} sources={message.sources} activeN={activeN} onCite={onCite} />
-      {streaming && <span aria-hidden className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-seal align-middle" />}
+      {streaming && (
+        <span
+          aria-hidden
+          className="ml-1 inline-block h-4.5 w-1.5 animate-pulse rounded-xs bg-seal align-middle shadow-xs"
+        />
+      )}
       {!streaming && message.sources.length > 0 && (
         <div className="mt-5 xl:hidden">
           <SourceList
@@ -97,13 +103,23 @@ function Pending({ turn, onRetry }) {
       <li>
         {turn.error ? (
           <ErrorState error={turn.error} onRetry={onRetry} className="max-w-measure" />
-        ) : turn.text ? (
-          <AssistantMessage message={{ content: turn.text, sources: turn.sources ?? [], cited: [] }} streaming />
         ) : (
-          <p className="flex items-center gap-2 text-graphite">
-            <Loader2 aria-hidden className="size-4 animate-spin" />
-            {turn.sources ? `Reading ${turn.sources.length} sections…` : "Finding the sections that apply…"}
-          </p>
+          <div className="max-w-measure space-y-3">
+            <ThinkingProcess
+              currentStatus={turn.currentStatus}
+              steps={turn.steps ?? []}
+              sources={turn.sources ?? []}
+              startTime={turn.startTime}
+              isStreaming={Boolean(turn.text)}
+              isDone={false}
+            />
+            {turn.text && (
+              <AssistantMessage
+                message={{ content: turn.text, sources: turn.sources ?? [], cited: [] }}
+                streaming
+              />
+            )}
+          </div>
         )}
       </li>
     </>
@@ -206,7 +222,15 @@ export default function Companion() {
     if (!question || (turn && !turn.error)) return;
     setDraft("");
     setAnnouncement("");
-    setTurn({ question, sources: null, text: "", error: null });
+    setTurn({
+      question,
+      sources: null,
+      text: "",
+      error: null,
+      startTime: Date.now(),
+      currentStatus: "Analyzing scenario facts & determining legal domain…",
+      steps: [],
+    });
     const ctrl = new AbortController();
     try {
       let id = conversationId;
@@ -226,10 +250,41 @@ export default function Companion() {
         content: question,
         signal: ctrl.signal,
         onEvent: (name, data) => {
-          if (name === "sources") setTurn((t) => t && { ...t, sources: data.sources });
-          else if (name === "delta") setTurn((t) => t && { ...t, text: t.text + data.text });
-          else if (name === "error") throw new ApiError("server", data.detail);
-          else if (name === "done") {
+          if (name === "status") {
+            setTurn((t) => {
+              if (!t) return t;
+              const newSteps = [...(t.steps ?? [])];
+              if (
+                t.currentStatus &&
+                t.currentStatus !== data.message &&
+                !newSteps.some((s) => s.message === t.currentStatus)
+              ) {
+                newSteps.push({ message: t.currentStatus, step: t.currentStep || "step" });
+              }
+              return {
+                ...t,
+                currentStatus: data.message,
+                currentStep: data.step,
+                steps: newSteps,
+              };
+            });
+          } else if (name === "sources") {
+            setTurn((t) => {
+              if (!t) return t;
+              const newSteps = [...(t.steps ?? [])];
+              if (
+                t.currentStatus &&
+                !newSteps.some((s) => s.message === t.currentStatus)
+              ) {
+                newSteps.push({ message: t.currentStatus, step: t.currentStep || "step" });
+              }
+              return { ...t, sources: data.sources, steps: newSteps };
+            });
+          } else if (name === "delta") {
+            setTurn((t) => t && { ...t, text: t.text + data.text });
+          } else if (name === "error") {
+            throw new ApiError("server", data.detail);
+          } else if (name === "done") {
             queryClient.setQueryData(["conversation", id], (old) => ({
               ...(old ?? { conversation_id: id }),
               title: data.title ?? old?.title ?? null,

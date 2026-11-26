@@ -71,7 +71,7 @@ def test_the_fetch_script_and_the_ingest_guard_agree():
 def test_no_indexed_provision_is_dead_law(path):
     dead = [
         d["section_number"]
-        for d in json.loads(path.read_text())
+        for d in json.loads(path.read_text(encoding="utf-8"))
         if is_dead_law(d.get("act", ""), d.get("section_number", ""), d.get("title", ""), d.get("content", ""))
     ]
     assert dead == [], f"{path.name} carries dead law: {dead[:10]}"
@@ -80,14 +80,14 @@ def test_no_indexed_provision_is_dead_law(path):
 def test_arbitration_s87_is_not_in_the_corpus():
     """Struck down in Hindustan Construction (2019), omitted by Act 3 of 2021,
     still rendered by India Code with its full operative text."""
-    numbers = {d["section_number"] for d in json.loads(pathlib.Path("data/arbitration_act.json").read_text())}
+    numbers = {d["section_number"] for d in json.loads(pathlib.Path("data/arbitration_act.json").read_text(encoding="utf-8"))}
     assert "Section 87" not in numbers
 
 
 def test_no_two_provisions_share_an_act_and_section():
     for path in DATA:
         seen = set()
-        for d in json.loads(path.read_text()):
+        for d in json.loads(path.read_text(encoding="utf-8")):
             key = (d.get("act"), d.get("section_number"))
             assert key not in seen, f"{path.name}: duplicate {key}"
             seen.add(key)

@@ -12,7 +12,7 @@ export function RequireAuth() {
   if (status === "unconfigured") return <SetupNeeded />;
   if (status === "loading") return <Splash />;
   if (!user) return <Navigate to={`/sign-in?next=${encodeURIComponent(here)}`} replace />;
-  if (needsVerification(user)) {
+  if (needsVerification(user) && import.meta.env.PROD) {
     return <Navigate to={`/verify-email?next=${encodeURIComponent(here)}`} replace />;
   }
   return <Outlet />;

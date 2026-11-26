@@ -82,10 +82,12 @@ def _fresh_limits():
     endpoint._ANSWERING.clear()
 
 
-def events(response):
+def events(response, drop_status=True):
     parsed = []
     for block in response.text.strip().split("\n\n"):
         lines = dict(line.split(": ", 1) for line in block.splitlines())
+        if drop_status and lines["event"] == "status":
+            continue
         parsed.append((lines["event"], json.loads(lines["data"])))
     return parsed
 
@@ -363,3 +365,13 @@ def test_the_model_is_told_when_every_section_matched_weakly(client, fakes):
     cid = new_conversation(client)
     send(client, cid, "my salary is unpaid")
     assert "matched the question only weakly" in fakes.model_messages[-1].content
+
+
+def test_status_events_stream_during_companion_answering(client, fakes):
+    cid = new_conversation(client)
+    all_events = events(send(client, cid), drop_status=False)
+    status_events = [data for kind, data in all_events if kind == "status"]
+    assert len(status_events) >= 2
+    steps = [s["step"] for s in status_events]
+    assert "understanding" in steps
+    assert "searching" in steps

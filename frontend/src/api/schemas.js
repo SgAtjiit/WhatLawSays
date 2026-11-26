@@ -280,6 +280,7 @@ export const conversationList = z.looseObject({
 
 /** The events a reply streams, by name. */
 export const chatEvents = {
+  status: z.looseObject({ step: z.string().default("thinking"), message: z.string() }),
   sources: z.looseObject({ sources: list(chatSource) }),
   delta: z.looseObject({ text: z.string() }),
   done: z.looseObject({ question: chatMessage, answer: chatMessage, title: maybeText }),

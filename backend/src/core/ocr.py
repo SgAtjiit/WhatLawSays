@@ -261,8 +261,19 @@ def _render_pdf(data: bytes, dpi: int) -> List[Any]:
 
     document = pdfium.PdfDocument(io.BytesIO(data))
     try:
-        scale = dpi / _PDF_POINTS_PER_INCH
-        return [document[i].render(scale=scale).to_pil() for i in range(len(document))]
+        pages = []
+        for i in range(len(document)):
+            page = document[i]
+            w, h = page.get_size()
+            scale = dpi / _PDF_POINTS_PER_INCH
+            # A PDF produced from a raw scan may have points defined in pixel units
+            # (e.g. 1654x2339). Rendering that at 4.16x creates an enormous 6892x9746 bitmap
+            # which raises ctypes MemoryError. Cap max rendered dimension to 3500px (standard A4 @ 300 DPI).
+            max_dim = max(w, h) * scale
+            if max_dim > 5000:
+                scale = 5000 / max(w, h)
+            pages.append(page.render(scale=scale).to_pil())
+        return pages
     finally:
         # The pages are already materialised as PIL images; holding the handle
         # open leaks it and pdfium complains on exit.

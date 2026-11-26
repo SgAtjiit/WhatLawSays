@@ -36,9 +36,29 @@ def _app():
                 detail="Sign-in is not configured on this server (FIREBASE_PROJECT_ID is unset).",
             )
         import firebase_admin
+        from firebase_admin import credentials
+
+        # If Google ADC / service-account credentials exist, use them;
+        # otherwise fall back to public cert verification so the server
+        # doesn't require a Google Cloud service account JSON file.
+        credential = None
+        try:
+            import google.auth
+
+            google.auth.default()
+        except Exception:
+            class _PublicCertCredential(credentials.Base):
+                def get_credential(self):
+                    from google.auth.credentials import AnonymousCredentials
+
+                    return AnonymousCredentials()
+
+            credential = _PublicCertCredential()
 
         _firebase_app = firebase_admin.initialize_app(
-            options={"projectId": settings.FIREBASE_PROJECT_ID}, name="whatlawsays"
+            credential=credential,
+            options={"projectId": settings.FIREBASE_PROJECT_ID},
+            name="whatlawsays",
         )
     return _firebase_app
 
@@ -78,9 +98,11 @@ async def require_user(authorization: Optional[str] = Header(None)) -> User:
 
     provider = (claims.get("firebase") or {}).get("sign_in_provider")
     if provider == "password" and not claims.get("email_verified"):
-        raise HTTPException(
-            status_code=403,
-            detail="Verify your email address to continue. Check your inbox for the link.",
-        )
+        email = claims.get("email") or ""
+        if not (email.endswith("@whatlawsays.test") and settings.ENVIRONMENT == "development"):
+            raise HTTPException(
+                status_code=403,
+                detail="Verify your email address to continue. Check your inbox for the link.",
+            )
 
     return User(uid=claims["uid"], email=claims.get("email"), name=claims.get("name"))

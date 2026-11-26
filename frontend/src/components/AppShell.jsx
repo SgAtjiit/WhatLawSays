@@ -39,8 +39,11 @@ function ServerStatus() {
   const { data: online, isPending } = useQuery({
     queryKey: ["health"],
     queryFn: checkHealth,
-    refetchInterval: 30_000,
-    retry: false,
+    refetchInterval: 10_000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    retry: 3,
+    retryDelay: 1000,
   });
   if (isPending || online) return null;
   return (

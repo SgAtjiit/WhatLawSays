@@ -5,9 +5,7 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  // Where the FastAPI backend runs in development. Requests stay same-origin
-  // in the browser, so there is no CORS to configure.
-  const backend = env.BACKEND_URL || "http://localhost:8000";
+  const backend = env.BACKEND_URL || "http://127.0.0.1:8000";
 
   return {
     plugins: [react(), tailwindcss()],

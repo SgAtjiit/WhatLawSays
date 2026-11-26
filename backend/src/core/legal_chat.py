@@ -182,7 +182,13 @@ async def plan_search(history: Sequence[Dict[str, str]], message: str) -> Search
         f"[CONVERSATION SO FAR]\n{_transcript(history) or '(none)'}\n\n"
         f"[LATEST MESSAGE]\n{message}"
     )
-    return await llm.ainvoke(prompt)
+    try:
+        return await llm.ainvoke(prompt)
+    except Exception as e:
+        err_str = str(e).lower()
+        if "tool" in err_str and ("needs_law: false" in err_str or "`false`" in err_str or "greeting" in err_str or "thanks" in err_str):
+            return SearchPlan(needs_law=False, search_query="")
+        raise
 
 
 SYSTEM_PROMPT = """You are WhatLawSays' Legal companion. You help a person in India understand what the law says about their situation, over a conversation. You are not a lawyer and do not act as one.
@@ -276,19 +282,44 @@ async def answer(
     degraded = not use_model
 
     query, needs_law = message, True
+    yield {
+        "event": "status",
+        "data": {
+            "step": "understanding",
+            "message": "Analyzing scenario facts and identifying legal domain...",
+        },
+    }
     if use_model:
         try:
+            yield {
+                "event": "status",
+                "data": {
+                    "step": "planning",
+                    "message": "Formulating statutory retrieval strategy...",
+                },
+            }
             plan = await plan_search(window, message)
             query, needs_law = plan.search_query or message, plan.needs_law
         except Exception as error:
             pipeline_logger.log_step(STAGE, f"Search planning failed ({type(error).__name__})", status="WARNING")
-            use_model, degraded = False, True
+            earlier = [m["content"] for m in window if m["role"] == "user"][-1:]
+            query = " ".join([*earlier, message]) if earlier else message
+            needs_law = True
+            use_model = False
+            degraded = True
     if not use_model:
         earlier = [m["content"] for m in window if m["role"] == "user"][-1:]
         query = " ".join([*earlier, message])
 
     sources: List[Dict[str, Any]] = []
     if needs_law:
+        yield {
+            "event": "status",
+            "data": {
+                "step": "searching",
+                "message": "Querying Indian statute corpus across penal, procedural & civil Acts...",
+            },
+        }
         try:
             sources = await retrieve(query)
         except Exception as error:
@@ -296,6 +327,13 @@ async def answer(
             yield {"event": "error", "data": {"detail": "The statute search isn't available right now. Try again in a minute."}}
             return
 
+    yield {
+        "event": "status",
+        "data": {
+            "step": "evaluating",
+            "message": f"Found {len(sources)} candidate sections. Evaluating applicability & statutory elements...",
+        },
+    }
     pipeline_logger.log_step(
         STAGE,
         f"{len(sources)} section(s) for {query[:120]!r} -> {'streaming answer' if use_model else 'model unavailable'}",
@@ -316,6 +354,14 @@ async def answer(
             "data": {"content": text, "cited": cited, "degraded": True, "sources": sources},
         }
         return
+
+    yield {
+        "event": "status",
+        "data": {
+            "step": "drafting",
+            "message": "Synthesizing legal explanation grounded in statutory citations...",
+        },
+    }
 
     parts: List[str] = []
     try:
